@@ -65,21 +65,33 @@ export function AssetLibrary({
   type,
   assets,
   setAssets,
+  remote,
 }: {
   type: AssetType;
   assets: Asset[];
   setAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
+  /** When provided, persistence is handled remotely (characters). */
+  remote?: undefined | {
+    save: (a: Asset, prev: Asset | undefined) => Promise<void>;
+    remove: (a: Asset) => Promise<void>;
+  };
 }) {
   const meta = ASSET_TYPES[type];
   const [q, setQ] = useState("");
   const [by, setBy] = useState<"all" | "name" | "code">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
+  const initialIds = useMemo(() => new Set(assets.map((a) => a.id)), [assets]);
   const list = useMemo(
     () => filterAssets(assets.filter((a) => a.type === type), q, by),
     [assets, type, q, by],
   );
 
-  const save = (a: Asset) => {
+  const save = async (a: Asset) => {
+    if (remote) {
+      await remote.save(a, assets.find((p) => p.id === a.id && initialIds.has(p.id)));
+      setEditing(null);
+      return;
+    }
     setAssets((prev) => (prev.some((p) => p.id === a.id) ? prev.map((p) => (p.id === a.id ? a : p)) : [...prev, a]));
     setEditing(null);
   };
@@ -139,7 +151,8 @@ export function AssetLibrary({
                   <h3 className="font-display text-lg tracking-tight">{a.name}</h3>
                   <p className="font-mono text-[11px] text-accent">{a.code}</p>
                   <p className="mt-2 line-clamp-2 text-xs text-muted-ink">{a.description}</p>
-                  <p className="mt-2 text-[11px] text-muted-ink">{a.images.length} ảnh tham chiếu</p>
+                  <p className="mt-2 text-[11px] text-muted-ink">📷 {a.images.length} ảnh tham chiếu</p>
+                  {a.masterImageId && <p className="text-[11px] font-medium text-accent">⭐ Có Master Image</p>}
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => setEditing(a)}
@@ -149,7 +162,9 @@ export function AssetLibrary({
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Xóa "${a.name}"?`)) setAssets((p) => p.filter((x) => x.id !== a.id));
+                        if (!confirm(`Xóa "${a.name}"?`)) return;
+                        if (remote) void remote.remove(a);
+                        else setAssets((p) => p.filter((x) => x.id !== a.id));
                       }}
                       className="flex-1 rounded-xl border border-line py-2 text-xs font-medium text-destructive hover:bg-background"
                     >
@@ -163,28 +178,62 @@ export function AssetLibrary({
         </div>
       )}
 
-      {editing && <AssetForm initial={editing} onCancel={() => setEditing(null)} onSave={save} />}
+      {editing && (
+        <AssetForm
+          initial={editing}
+          isNew={!initialIds.has(editing.id)}
+          remote={!!remote}
+          onCancel={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
     </div>
   );
 }
 
-function AssetForm({ initial, onCancel, onSave }: { initial: Asset; onCancel: () => void; onSave: (a: Asset) => void }) {
+function AssetForm({
+  initial,
+  isNew,
+  remote,
+  onCancel,
+  onSave,
+}: {
+  initial: Asset;
+  isNew: boolean;
+  remote: boolean;
+  onCancel: () => void;
+  onSave: (a: Asset) => Promise<void> | void;
+}) {
   const [a, setA] = useState<Asset>(initial);
+  const [warn, setWarn] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const meta = ASSET_TYPES[a.type];
 
   const upload = async (files: FileList | null) => {
     if (!files) return;
     const imgs = await Promise.all(
-      Array.from(files).map(async (f) => ({ id: newId("img"), url: await fileToDataUrl(f) })),
+      Array.from(files)
+        .filter((f) => /image\/(jpeg|png|webp)/.test(f.type))
+        .map(async (f) =>
+          remote
+            ? { id: newId("new"), url: URL.createObjectURL(f), file: f }
+            : { id: newId("img"), url: await fileToDataUrl(f) },
+        ),
     );
     setA((p) => ({ ...p, images: [...p.images, ...imgs], masterImageId: p.masterImageId ?? imgs[0]?.id ?? null }));
   };
 
-  const removeImg = (id: string) =>
+  const removeImg = (id: string) => {
+    if (a.masterImageId === id) {
+      setWarn("Đây là Master Image. Vui lòng chọn một ảnh khác làm Master trước khi xóa.");
+      return;
+    }
+    setWarn(null);
     setA((p) => {
       const images = p.images.filter((i) => i.id !== id);
       return { ...p, images, masterImageId: p.masterImageId === id ? (images[0]?.id ?? null) : p.masterImageId };
     });
+  };
 
   const valid = a.name.trim() && a.code.trim();
 
@@ -195,48 +244,14 @@ function AssetForm({ initial, onCancel, onSave }: { initial: Asset; onCancel: ()
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 font-display text-xl tracking-tight">
-          {initial.name ? `Chỉnh sửa: ${initial.name}` : meta.add.replace("+ ", "")}
+          {isNew ? meta.add.replace("+ ", "") : `Chỉnh sửa: ${initial.name}`}
         </h3>
 
-        <p className="mb-2 text-sm font-medium">Ảnh tham chiếu</p>
-        <div className="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
-          {a.images.map((img) => (
-            <div key={img.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-line">
-              <img src={img.url} alt="" className="size-full object-cover" />
-              {a.masterImageId === img.id ? (
-                <span className="absolute left-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">
-                  ⭐ Master
-                </span>
-              ) : (
-                <button
-                  onClick={() => setA({ ...a, masterImageId: img.id })}
-                  className="absolute left-1.5 top-1.5 rounded-md bg-surface/95 px-1.5 py-0.5 text-[10px] font-medium"
-                >
-                  ☆ Đặt Master
-                </button>
-              )}
-              <button
-                onClick={() => removeImg(img.id)}
-                className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-surface/95 text-xs"
-                title="Xóa ảnh"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <label className="grid aspect-square cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-line text-center text-xs text-muted-ink hover:border-accent">
-            <span>
-              <span className="block text-2xl">+</span>Tải ảnh lên
-            </span>
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
-          </label>
-        </div>
-
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Tên *">
+          <Field label={a.type === "character" ? "Tên nhân vật *" : "Tên *"}>
             <input className={input} value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} />
           </Field>
-          <Field label="Mã *">
+          <Field label={a.type === "character" ? "Mã nhân vật *" : "Mã *"}>
             <input
               className={`${input} font-mono`}
               value={a.code}
@@ -275,16 +290,90 @@ function AssetForm({ initial, onCancel, onSave }: { initial: Asset; onCancel: ()
           </div>
         </div>
 
+        <div className="mb-2 mt-5 flex items-center justify-between">
+          <p className="text-sm font-medium">Ảnh tham chiếu</p>
+          <label className="cursor-pointer rounded-full bg-ink px-4 py-2 text-xs font-semibold text-background hover:bg-ink/90">
+            + Tải ảnh lên
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void upload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        {warn && (
+          <p className="mb-2 rounded-xl bg-accent-soft px-3 py-2 text-xs font-medium text-accent">{warn}</p>
+        )}
+        {a.images.length === 0 ? (
+          <p className="rounded-2xl border-2 border-dashed border-line py-8 text-center text-xs text-muted-ink">
+            Chưa có ảnh. Hỗ trợ JPG, JPEG, PNG, WEBP — có thể chọn nhiều ảnh cùng lúc.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {a.images.map((img) => {
+              const isMaster = a.masterImageId === img.id;
+              return (
+                <div
+                  key={img.id}
+                  className={`overflow-hidden rounded-2xl border-2 ${isMaster ? "border-accent" : "border-line"}`}
+                >
+                  <div className="relative aspect-square bg-background">
+                    <img src={img.url} alt="" className="size-full object-cover" />
+                    {isMaster && (
+                      <span className="absolute left-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-foreground">
+                        ⭐ MASTER IMAGE
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1 p-1.5">
+                    {!isMaster && (
+                      <button
+                        onClick={() => {
+                          setWarn(null);
+                          setA({ ...a, masterImageId: img.id });
+                        }}
+                        className="flex-1 rounded-lg bg-accent-soft py-1.5 text-[10px] font-semibold text-accent"
+                      >
+                        ⭐ Đặt làm Master
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeImg(img.id)}
+                      className="flex-1 rounded-lg border border-line py-1.5 text-[10px] font-medium text-destructive"
+                    >
+                      Xóa ảnh
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onCancel} className="rounded-full border border-line px-5 py-2.5 text-sm font-medium">
             Hủy
           </button>
           <button
-            disabled={!valid}
-            onClick={() => onSave({ ...a, name: a.name.trim(), code: a.code.trim() })}
+            disabled={!valid || saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave({ ...a, name: a.name.trim(), code: a.code.trim() });
+              } catch (e) {
+                setWarn(`Không lưu được: ${e instanceof Error ? e.message : "lỗi không xác định"}`);
+              } finally {
+                setSaving(false);
+              }
+            }}
             className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
-            Lưu
+            {saving ? "Đang lưu…" : "Lưu"}
           </button>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 export type AssetType = "character" | "location" | "ingredient" | "prop";
 
-export type AssetImage = { id: string; url: string };
+export type AssetImage = { id: string; url: string; path?: string; file?: File };
 
 export type Asset = {
   id: string; // unique id, never the name
@@ -36,7 +36,7 @@ export const ASSET_TYPES: Record<
     icon: "👤",
     fields: [
       { key: "gender", label: "Giới tính" },
-      { key: "age", label: "Tuổi" },
+      { key: "age", label: "Độ tuổi" },
       { key: "outfit", label: "Trang phục" },
       { key: "traits", label: "Đặc điểm nhận diện" },
     ],
@@ -90,8 +90,6 @@ function demo(type: AssetType, name: string, code: string, description: string, 
 }
 
 export const DEMO_ASSETS: Asset[] = [
-  demo("character", "Mèo Golden", "CHAR_GOLDEN_NY1", "Mèo Golden màu NY1, thân hình mập mũm mĩm nhưng không béo phì.", 38),
-  demo("character", "Cô gái", "CHAR_GIRL_001", "Cô gái trẻ, tóc dài, phong cách giản dị.", 340),
   demo("location", "Quán mì Việt Nam", "BG_QUAN_MI_001", "Quán mì nhỏ, bàn gỗ, ánh đèn vàng ấm.", 25),
   demo("location", "Bếp củi miền Tây", "BG_BEP_CUI_001", "Bếp củi dài, mỗi bếp riêng biệt, không nối liền nhau, không gian bếp dân dã Việt Nam.", 15),
   demo("ingredient", "Mì", "ING_MI_001", "Sợi mì vàng, dai, xoăn nhẹ.", 48),
@@ -115,12 +113,12 @@ export const toSceneAsset = (a: Asset): SceneAsset => ({
 const KEY = "storyboard.assets.v2";
 
 export function useAssets() {
-  const [assets, setAssets] = useState<Asset[]>(DEMO_ASSETS);
+  const [assets, setAssets] = useState<Asset[]>(DEMO_ASSETS.filter((a) => a.type !== "character"));
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setAssets(JSON.parse(raw) as Asset[]);
+      if (raw) setAssets((JSON.parse(raw) as Asset[]).filter((a) => a.type !== "character"));
     } catch {
       /* ignore */
     }

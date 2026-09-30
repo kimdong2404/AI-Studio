@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+- Characters and their reference images live in Lovable Cloud (tables characters, character_images; private bucket character-images, read via signed URLs); other asset types still use localStorage — V2 requirement: real image storage, no base64, for characters.
+- No user accounts yet: character tables/bucket are open to anonymous users by design (spec says no auth in V2).
