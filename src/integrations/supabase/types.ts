@@ -14,7 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      character_images: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          image_url: string
+          is_master: boolean
+          storage_path: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          is_master?: boolean
+          storage_path: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_master?: boolean
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_images_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      characters: {
+        Row: {
+          age: string
+          clothing: string
+          code: string
+          created_at: string
+          description: string
+          gender: string
+          id: string
+          name: string
+          notes: string
+          recognition_features: string
+        }
+        Insert: {
+          age?: string
+          clothing?: string
+          code: string
+          created_at?: string
+          description?: string
+          gender?: string
+          id?: string
+          name: string
+          notes?: string
+          recognition_features?: string
+        }
+        Update: {
+          age?: string
+          clothing?: string
+          code?: string
+          created_at?: string
+          description?: string
+          gender?: string
+          id?: string
+          name?: string
+          notes?: string
+          recognition_features?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
