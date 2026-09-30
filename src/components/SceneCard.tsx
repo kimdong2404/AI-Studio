@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Scene } from "@/lib/storyboard";
+import { ASSET_TYPES, type AssetType } from "@/lib/assets";
 
 type Props = {
   scene: Scene;
@@ -8,9 +9,11 @@ type Props = {
   onChange: (scene: Scene) => void;
   onDuplicate: () => void;
   onRegenerate: () => void;
+  onPickAssets: () => void;
 };
 
-const FIELDS: Array<{ key: keyof Scene; label: string; wide?: boolean }> = [
+type TextKey = "character" | "location" | "props" | "camera" | "duration";
+const FIELDS: Array<{ key: TextKey; label: string; wide?: boolean }> = [
   { key: "character", label: "Nhân vật" },
   { key: "location", label: "Bối cảnh" },
   { key: "props", label: "Đạo cụ" },
@@ -18,7 +21,8 @@ const FIELDS: Array<{ key: keyof Scene; label: string; wide?: boolean }> = [
   { key: "duration", label: "Thời lượng", wide: true },
 ];
 
-export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegenerate }: Props) {
+export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegenerate, onPickAssets }: Props) {
+  const sceneAssets = scene.assets ?? [];
   const [editing, setEditing] = useState(false);
 
   return (
@@ -83,6 +87,41 @@ export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegene
             </dl>
           </>
         )}
+
+        <div className="mt-4 rounded-2xl border border-line bg-background p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold">Asset sử dụng</span>
+            <button onClick={onPickAssets} className="rounded-full bg-accent-soft px-3 py-1 text-[11px] font-semibold text-accent hover:bg-accent/20">
+              + Chọn asset
+            </button>
+          </div>
+          {sceneAssets.length === 0 ? (
+            <p className="text-[11px] text-muted-ink">Chưa chọn asset nào.</p>
+          ) : (
+            <div className="space-y-2">
+              {(Object.keys(ASSET_TYPES) as AssetType[]).map((t) => {
+                const items = sceneAssets.filter((a) => a.asset_type === t);
+                if (!items.length) return null;
+                return (
+                  <div key={t}>
+                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-ink">{ASSET_TYPES[t].label}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {items.map((a) => (
+                        <span key={a.asset_id} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1 pl-1 pr-2">
+                          {a.master_image && <img src={a.master_image} alt="" className="size-6 rounded object-cover" />}
+                          <span className="text-[11px] font-medium leading-tight">
+                            {a.asset_name}
+                            <span className="block font-mono text-[9px] text-muted-ink">{a.asset_code}</span>
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 flex gap-2">
           <button

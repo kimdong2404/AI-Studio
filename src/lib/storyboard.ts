@@ -1,3 +1,5 @@
+import type { SceneAsset } from "./assets";
+
 export type Scene = {
   id: string;
   title: string;
@@ -7,6 +9,7 @@ export type Scene = {
   props: string;
   camera: string;
   duration: string;
+  assets?: SceneAsset[];
 };
 
 let counter = 0;
