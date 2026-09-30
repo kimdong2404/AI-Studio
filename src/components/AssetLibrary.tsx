@@ -249,19 +249,19 @@ function AssetForm({
         </h3>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={a.type === "character" ? "Tên nhân vật *" : a.type === "location" ? "Tên bối cảnh *" : "Tên *"}>
+          <Field label={a.type === "character" ? "Tên nhân vật *" : a.type === "location" ? "Tên bối cảnh *" : a.type === "ingredient" ? "Tên nguyên liệu *" : "Tên *"}>
             <input className={input} value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} />
           </Field>
-          <Field label={a.type === "character" ? "Mã nhân vật *" : a.type === "location" ? "Mã bối cảnh *" : "Mã *"}>
+          <Field label={a.type === "character" ? "Mã nhân vật *" : a.type === "location" ? "Mã bối cảnh *" : a.type === "ingredient" ? "Mã nguyên liệu *" : "Mã *"}>
             <input
               className={`${input} font-mono`}
               value={a.code}
-              placeholder={a.type === "location" ? "VD: LOC_KITCHEN_001" : "VD: CHAR_GOLDEN_NY1"}
+              placeholder={a.type === "location" ? "VD: LOC_KITCHEN_001" : a.type === "ingredient" ? "VD: ING_GREEN_CHILI_001" : "VD: CHAR_GOLDEN_NY1"}
               onChange={(e) => setA({ ...a, code: e.target.value.toUpperCase().replace(/\s+/g, "_") })}
             />
           </Field>
           <div className="sm:col-span-2">
-            <Field label={a.type === "character" ? "Mô tả ngoại hình" : a.type === "ingredient" ? "Mô tả hình dạng" : "Mô tả"}>
+            <Field label={a.type === "character" ? "Mô tả ngoại hình" : "Mô tả"}>
               <textarea
                 rows={3}
                 className={`${input} resize-none`}
@@ -365,8 +365,8 @@ function AssetForm({
             onClick={async () => {
               if (!valid) {
                 const missing = [
-                  !a.name.trim() && (a.type === "location" ? "Tên bối cảnh" : a.type === "character" ? "Tên nhân vật" : "Tên"),
-                  !a.code.trim() && (a.type === "location" ? "Mã bối cảnh" : a.type === "character" ? "Mã nhân vật" : "Mã"),
+                  !a.name.trim() && (a.type === "location" ? "Tên bối cảnh" : a.type === "character" ? "Tên nhân vật" : a.type === "ingredient" ? "Tên nguyên liệu" : "Tên"),
+                  !a.code.trim() && (a.type === "location" ? "Mã bối cảnh" : a.type === "character" ? "Mã nhân vật" : a.type === "ingredient" ? "Mã nguyên liệu" : "Mã"),
                 ].filter(Boolean);
                 setWarn(`Vui lòng nhập: ${missing.join(", ")}.`);
                 return;
@@ -379,7 +379,7 @@ function AssetForm({
                 console.error("[save asset] failed", e);
                 const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "lỗi không xác định";
                 setWarn(
-                  `${a.type === "location" ? "Không thể lưu bối cảnh" : "Không thể lưu"}. Vui lòng kiểm tra kết nối lưu trữ ảnh. (${msg})`,
+                  `${a.type === "location" ? "Không thể lưu bối cảnh" : a.type === "ingredient" ? "Không thể lưu nguyên liệu" : "Không thể lưu"}. Vui lòng kiểm tra kết nối lưu trữ ảnh. (${msg})`,
                 );
               } finally {
                 setSaving(false);
@@ -387,7 +387,7 @@ function AssetForm({
             }}
             className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
-            {saving ? "Đang lưu…" : isNew && a.type === "location" ? "Thêm bối cảnh" : "Lưu"}
+            {saving ? "Đang lưu…" : isNew && a.type === "location" ? "Thêm bối cảnh" : isNew && a.type === "ingredient" ? "Thêm nguyên liệu" : "Lưu"}
           </button>
         </div>
       </div>

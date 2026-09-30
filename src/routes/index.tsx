@@ -6,6 +6,7 @@ import { AssetPicker } from "@/components/AssetPicker";
 import { useAssets } from "@/lib/assets";
 import { deleteCharacter, saveCharacter, useCharacters } from "@/lib/characters";
 import { deleteLocation, saveLocation, useLocations } from "@/lib/locations";
+import { deleteIngredient, saveIngredient, useIngredients } from "@/lib/ingredients";
 import {
   analyzeScript,
   emptyScene,
@@ -61,7 +62,8 @@ function StudioPage() {
   const [localAssets, setAssets] = useAssets();
   const characters = useCharacters();
   const locations = useLocations();
-  const assets = [...characters.list, ...locations.list, ...localAssets];
+  const ingredients = useIngredients();
+  const assets = [...characters.list, ...locations.list, ...ingredients.list, ...localAssets];
   const [pickFor, setPickFor] = useState<string | null>(null);
 
   const workspaceVisible = section === "script" || section === "storyboard";
@@ -268,7 +270,18 @@ function StudioPage() {
                         await locations.reload();
                       },
                     }
-                  : undefined
+                  : section === "ingredients"
+                    ? {
+                        save: async (a, prev) => {
+                          await saveIngredient(a, prev);
+                          await ingredients.reload();
+                        },
+                        remove: async (a) => {
+                          await deleteIngredient(a);
+                          await ingredients.reload();
+                        },
+                      }
+                    : undefined
             }
           />
         )}
