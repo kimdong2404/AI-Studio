@@ -77,13 +77,22 @@ export function createRemoteAssets(cfg: RemoteConfig) {
   }
 
   async function save(a: Asset, previous: Asset | undefined) {
+    // eslint-disable-next-line no-param-reassign
     const row: Record<string, string> = { name: a.name, code: a.code, description: a.description, notes: a.notes };
     for (const [k, col] of Object.entries(cfg.columns)) row[col] = a.details[k] ?? "";
     let id = previous?.id;
     if (id) {
-      const { error } = await db.from(cfg.table).update(row).eq("id", id);
+      const { data: upd, error } = await db.from(cfg.table).update(row).eq("id", id).select("id");
       if (error) throw error;
-    } else {
+      // Record vanished (deleted elsewhere): recreate it and re-upload every image.
+      if (!upd?.length) {
+        console.warn(`[save] ${cfg.table} ${id} no longer exists — creating a new record`);
+        id = undefined;
+        previous = undefined;
+        a = { ...a, images: a.images.filter((i) => i.file) };
+      }
+    }
+    if (!id) {
       const { data, error } = await db.from(cfg.table).insert(row).select("id").single();
       if (error) throw error;
       id = data.id as string;
