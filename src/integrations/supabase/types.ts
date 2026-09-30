@@ -88,6 +88,83 @@ export type Database = {
         }
         Relationships: []
       }
+      location_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          is_master: boolean
+          location_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          is_master?: boolean
+          location_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_master?: boolean
+          location_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_images_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          code: string
+          color_lighting: string
+          created_at: string
+          description: string
+          id: string
+          location_type: string
+          name: string
+          notes: string
+          recognition_features: string
+          style: string
+          time_of_day: string
+        }
+        Insert: {
+          code: string
+          color_lighting?: string
+          created_at?: string
+          description?: string
+          id?: string
+          location_type?: string
+          name: string
+          notes?: string
+          recognition_features?: string
+          style?: string
+          time_of_day?: string
+        }
+        Update: {
+          code?: string
+          color_lighting?: string
+          created_at?: string
+          description?: string
+          id?: string
+          location_type?: string
+          name?: string
+          notes?: string
+          recognition_features?: string
+          style?: string
+          time_of_day?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

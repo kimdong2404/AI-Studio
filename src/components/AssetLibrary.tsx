@@ -248,14 +248,14 @@ function AssetForm({
         </h3>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={a.type === "character" ? "Tên nhân vật *" : "Tên *"}>
+          <Field label={a.type === "character" ? "Tên nhân vật *" : a.type === "location" ? "Tên bối cảnh *" : "Tên *"}>
             <input className={input} value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} />
           </Field>
-          <Field label={a.type === "character" ? "Mã nhân vật *" : "Mã *"}>
+          <Field label={a.type === "character" ? "Mã nhân vật *" : a.type === "location" ? "Mã bối cảnh *" : "Mã *"}>
             <input
               className={`${input} font-mono`}
               value={a.code}
-              placeholder="VD: CHAR_GOLDEN_NY1"
+              placeholder={a.type === "location" ? "VD: LOC_KITCHEN_001" : "VD: CHAR_GOLDEN_NY1"}
               onChange={(e) => setA({ ...a, code: e.target.value.toUpperCase().replace(/\s+/g, "_") })}
             />
           </Field>
@@ -373,7 +373,7 @@ function AssetForm({
             }}
             className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
-            {saving ? "Đang lưu…" : "Lưu"}
+            {saving ? "Đang lưu…" : isNew && a.type === "location" ? "Thêm bối cảnh" : "Lưu"}
           </button>
         </div>
       </div>

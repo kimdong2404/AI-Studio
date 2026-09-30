@@ -47,9 +47,11 @@ export const ASSET_TYPES: Record<
     add: "+ Thêm bối cảnh",
     icon: "🏠",
     fields: [
-      { key: "style", label: "Phong cách" },
+      { key: "locType", label: "Loại bối cảnh" },
+      { key: "traits", label: "Đặc điểm nhận diện" },
+      { key: "lighting", label: "Màu sắc / ánh sáng" },
       { key: "time", label: "Thời gian trong ngày" },
-      { key: "view", label: "Góc nhìn" },
+      { key: "style", label: "Phong cách" },
     ],
   },
   ingredient: {
@@ -113,12 +115,12 @@ export const toSceneAsset = (a: Asset): SceneAsset => ({
 const KEY = "storyboard.assets.v2";
 
 export function useAssets() {
-  const [assets, setAssets] = useState<Asset[]>(DEMO_ASSETS.filter((a) => a.type !== "character"));
+  const [assets, setAssets] = useState<Asset[]>(DEMO_ASSETS.filter((a) => a.type !== "character" && a.type !== "location"));
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setAssets((JSON.parse(raw) as Asset[]).filter((a) => a.type !== "character"));
+      if (raw) setAssets((JSON.parse(raw) as Asset[]).filter((a) => a.type !== "character" && a.type !== "location"));
     } catch {
       /* ignore */
     }
