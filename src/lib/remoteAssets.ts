@@ -21,6 +21,28 @@ export type RemoteConfig = {
 
 type ImgRow = { id: string; storage_path: string; is_master: boolean } & Record<string, string | boolean>;
 
+const MAX_BYTES = 4 * 1024 * 1024;
+const MAX_SIDE = 2560;
+
+/** Downscale/re-encode large images so they fit the storage size limit. */
+async function shrinkImage(file: File): Promise<File> {
+  if (file.size <= MAX_BYTES) return file;
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bmp.width * scale);
+  canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  for (const q of [0.9, 0.8, 0.7, 0.6]) {
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", q));
+    if (blob && (blob.size <= MAX_BYTES || q === 0.6)) {
+      return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+    }
+  }
+  return file;
+}
+
 export function createRemoteAssets(cfg: RemoteConfig) {
   async function fetchAll(): Promise<Asset[]> {
     const [{ data: rows, error: e1 }, { data: imgs, error: e2 }] = await Promise.all([
@@ -78,11 +100,14 @@ export function createRemoteAssets(cfg: RemoteConfig) {
     await db.from(cfg.imageTable).update({ is_master: false }).eq(cfg.fk, id);
     let masterDbId: string | null = a.images.find((i) => i.id === a.masterImageId && !i.file)?.id ?? null;
     for (const img of a.images.filter((i) => i.file)) {
-      const file = img.file as File;
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const file = await shrinkImage(img.file as File);
+      const ext = file.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "jpg").toLowerCase();
       const path = `${cfg.pathPrefix}${id}/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
-      if (upErr) throw upErr;
+      if (upErr) {
+        console.error("[upload] failed", path, upErr);
+        throw new Error(`Không thể tải ảnh "${img.file?.name}" lên: ${upErr.message}`);
+      }
       const { data, error } = await db
         .from(cfg.imageTable)
         .insert({ [cfg.fk]: id, storage_path: path, image_url: `${BUCKET}/${path}` })
