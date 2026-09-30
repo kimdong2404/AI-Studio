@@ -361,8 +361,17 @@ function AssetForm({
             Hủy
           </button>
           <button
-            disabled={!valid || saving}
+            disabled={saving}
             onClick={async () => {
+              if (!valid) {
+                const missing = [
+                  !a.name.trim() && (a.type === "location" ? "Tên bối cảnh" : a.type === "character" ? "Tên nhân vật" : "Tên"),
+                  !a.code.trim() && (a.type === "location" ? "Mã bối cảnh" : a.type === "character" ? "Mã nhân vật" : "Mã"),
+                ].filter(Boolean);
+                setWarn(`Vui lòng nhập: ${missing.join(", ")}.`);
+                return;
+              }
+              setWarn(null);
               setSaving(true);
               try {
                 await onSave({ ...a, name: a.name.trim(), code: a.code.trim() });
