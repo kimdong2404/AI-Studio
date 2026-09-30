@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ASSET_TYPES, masterUrl, toSceneAsset, type Asset, type AssetType, type SceneAsset } from "@/lib/assets";
 import { filterAssets, SearchBar } from "./AssetLibrary";
 
@@ -34,7 +35,7 @@ export function AssetPicker({
     onSave([...fromLib, ...orphan]);
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4" onClick={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-4 font-display text-xl tracking-tight">Chọn asset cho cảnh</h3>
@@ -89,6 +90,7 @@ export function AssetPicker({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
