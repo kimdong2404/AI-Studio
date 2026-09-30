@@ -366,7 +366,11 @@ function AssetForm({
               try {
                 await onSave({ ...a, name: a.name.trim(), code: a.code.trim() });
               } catch (e) {
-                setWarn(`Không lưu được: ${e instanceof Error ? e.message : "lỗi không xác định"}`);
+                console.error("[save asset] failed", e);
+                const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "lỗi không xác định";
+                setWarn(
+                  `${a.type === "location" ? "Không thể lưu bối cảnh" : "Không thể lưu"}. Vui lòng kiểm tra kết nối lưu trữ ảnh. (${msg})`,
+                );
               } finally {
                 setSaving(false);
               }
