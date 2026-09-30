@@ -66,10 +66,10 @@ export async function saveCharacter(a: Asset, previous: Asset | undefined) {
     name: a.name,
     code: a.code,
     description: a.description,
-    gender: a.details.gender ?? "",
-    age: a.details.age ?? "",
-    clothing: a.details.outfit ?? "",
-    recognition_features: a.details.traits ?? "",
+    gender: a.details['gender'] ?? "",
+    age: a.details['age'] ?? "",
+    clothing: a.details['outfit'] ?? "",
+    recognition_features: a.details['traits'] ?? "",
     notes: a.notes,
   };
   let id = previous?.id;

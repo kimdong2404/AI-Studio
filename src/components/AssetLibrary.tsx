@@ -71,7 +71,7 @@ export function AssetLibrary({
   assets: Asset[];
   setAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
   /** When provided, persistence is handled remotely (characters). */
-  remote?: {
+  remote?: undefined | {
     save: (a: Asset, prev: Asset | undefined) => Promise<void>;
     remove: (a: Asset) => Promise<void>;
   };
