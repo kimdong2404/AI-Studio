@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ASSET_TYPES,
   fileToDataUrl,
@@ -237,7 +238,7 @@ function AssetForm({
 
   const valid = a.name.trim() && a.code.trim();
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4" onClick={onCancel}>
       <div
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-surface p-6"
@@ -382,6 +383,8 @@ function AssetForm({
         </div>
       </div>
     </div>
+  ,
+    document.body,
   );
 }
 
