@@ -88,6 +88,83 @@ export type Database = {
         }
         Relationships: []
       }
+      ingredient_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          ingredient_id: string
+          is_master: boolean
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          ingredient_id: string
+          is_master?: boolean
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          ingredient_id?: string
+          is_master?: boolean
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingredient_images_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "ingredients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingredients: {
+        Row: {
+          code: string
+          color: string
+          created_at: string
+          description: string
+          freshness: string
+          id: string
+          ingredient_type: string
+          name: string
+          notes: string
+          recognition_features: string
+          shape: string
+        }
+        Insert: {
+          code: string
+          color?: string
+          created_at?: string
+          description?: string
+          freshness?: string
+          id?: string
+          ingredient_type?: string
+          name: string
+          notes?: string
+          recognition_features?: string
+          shape?: string
+        }
+        Update: {
+          code?: string
+          color?: string
+          created_at?: string
+          description?: string
+          freshness?: string
+          id?: string
+          ingredient_type?: string
+          name?: string
+          notes?: string
+          recognition_features?: string
+          shape?: string
+        }
+        Relationships: []
+      }
       location_images: {
         Row: {
           created_at: string
