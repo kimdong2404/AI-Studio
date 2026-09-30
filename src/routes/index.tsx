@@ -65,8 +65,9 @@ function StudioPage() {
   const duplicateScene = (id: string) =>
     setScenes((prev) => {
       const i = prev.findIndex((s) => s.id === id);
-      if (i < 0) return prev;
-      const copy = { ...prev[i], id: `${prev[i].id}-copy-${Date.now()}` };
+      const source = prev[i];
+      if (!source) return prev;
+      const copy: Scene = { ...source, id: `${source.id}-copy-${Date.now()}` };
       return [...prev.slice(0, i + 1), copy, ...prev.slice(i + 1)];
     });
 
@@ -76,12 +77,13 @@ function StudioPage() {
         s.id === id
           ? {
               ...s,
-              camera: CAMERAS[(CAMERAS.indexOf(s.camera) + 1) % CAMERAS.length],
+              camera: CAMERAS[(CAMERAS.indexOf(s.camera) + 1) % CAMERAS.length] ?? s.camera,
               duration: `${3 + ((parseInt(s.duration, 10) || 3) % 4)} giây`,
             }
           : s,
       ),
     );
+
 
   return (
     <div className="min-h-screen bg-background font-body text-ink antialiased">

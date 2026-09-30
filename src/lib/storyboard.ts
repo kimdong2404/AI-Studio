@@ -143,9 +143,10 @@ export function analyzeScript(script: string): Scene[] {
     character: match(CHARACTERS, text, "—"),
     location: match(LOCATIONS, text, "Chưa xác định"),
     props: match(PROPS, text, "—"),
-    camera: CAMERAS[i % CAMERAS.length],
+    camera: CAMERAS[i % CAMERAS.length] ?? "Trung cảnh",
     duration: `${3 + (i % 3)} giây`,
   }));
+
 }
 
 export function emptyScene(index: number): Scene {
