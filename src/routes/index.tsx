@@ -4,6 +4,7 @@ import { SceneCard } from "@/components/SceneCard";
 import { AssetLibrary } from "@/components/AssetLibrary";
 import { AssetPicker } from "@/components/AssetPicker";
 import { useAssets } from "@/lib/assets";
+import { deleteCharacter, saveCharacter, useCharacters } from "@/lib/characters";
 import {
   analyzeScript,
   emptyScene,
@@ -56,7 +57,9 @@ function StudioPage() {
   const [script, setScript] = useState(SAMPLE_SCRIPT);
   const [scenes, setScenes] = useState<Scene[]>(SAMPLE_SCENES);
   const [analyzing, setAnalyzing] = useState(false);
-  const [assets, setAssets] = useAssets();
+  const [localAssets, setAssets] = useAssets();
+  const characters = useCharacters();
+  const assets = [...characters.list, ...localAssets];
   const [pickFor, setPickFor] = useState<string | null>(null);
 
   const workspaceVisible = section === "script" || section === "storyboard";
@@ -240,6 +243,20 @@ function StudioPage() {
             type={LIB_TYPE[section as keyof typeof LIB_TYPE]}
             assets={assets}
             setAssets={setAssets}
+            remote={
+              section === "characters"
+                ? {
+                    save: async (a, prev) => {
+                      await saveCharacter(a, prev);
+                      await characters.reload();
+                    },
+                    remove: async (a) => {
+                      await deleteCharacter(a);
+                      await characters.reload();
+                    },
+                  }
+                : undefined
+            }
           />
         )}
         {pickFor && (

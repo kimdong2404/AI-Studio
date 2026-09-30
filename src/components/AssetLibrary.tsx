@@ -178,7 +178,15 @@ export function AssetLibrary({
         </div>
       )}
 
-      {editing && <AssetForm initial={editing} onCancel={() => setEditing(null)} onSave={save} />}
+      {editing && (
+        <AssetForm
+          initial={editing}
+          isNew={!initialIds.has(editing.id)}
+          remote={!!remote}
+          onCancel={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
     </div>
   );
 }
