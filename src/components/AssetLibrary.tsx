@@ -65,21 +65,33 @@ export function AssetLibrary({
   type,
   assets,
   setAssets,
+  remote,
 }: {
   type: AssetType;
   assets: Asset[];
   setAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
+  /** When provided, persistence is handled remotely (characters). */
+  remote?: {
+    save: (a: Asset, prev: Asset | undefined) => Promise<void>;
+    remove: (a: Asset) => Promise<void>;
+  };
 }) {
   const meta = ASSET_TYPES[type];
   const [q, setQ] = useState("");
   const [by, setBy] = useState<"all" | "name" | "code">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
+  const initialIds = useMemo(() => new Set(assets.map((a) => a.id)), [assets]);
   const list = useMemo(
     () => filterAssets(assets.filter((a) => a.type === type), q, by),
     [assets, type, q, by],
   );
 
-  const save = (a: Asset) => {
+  const save = async (a: Asset) => {
+    if (remote) {
+      await remote.save(a, assets.find((p) => p.id === a.id && initialIds.has(p.id)));
+      setEditing(null);
+      return;
+    }
     setAssets((prev) => (prev.some((p) => p.id === a.id) ? prev.map((p) => (p.id === a.id ? a : p)) : [...prev, a]));
     setEditing(null);
   };
@@ -139,7 +151,8 @@ export function AssetLibrary({
                   <h3 className="font-display text-lg tracking-tight">{a.name}</h3>
                   <p className="font-mono text-[11px] text-accent">{a.code}</p>
                   <p className="mt-2 line-clamp-2 text-xs text-muted-ink">{a.description}</p>
-                  <p className="mt-2 text-[11px] text-muted-ink">{a.images.length} ảnh tham chiếu</p>
+                  <p className="mt-2 text-[11px] text-muted-ink">📷 {a.images.length} ảnh tham chiếu</p>
+                  {a.masterImageId && <p className="text-[11px] font-medium text-accent">⭐ Có Master Image</p>}
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => setEditing(a)}
@@ -149,7 +162,9 @@ export function AssetLibrary({
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Xóa "${a.name}"?`)) setAssets((p) => p.filter((x) => x.id !== a.id));
+                        if (!confirm(`Xóa "${a.name}"?`)) return;
+                        if (remote) void remote.remove(a);
+                        else setAssets((p) => p.filter((x) => x.id !== a.id));
                       }}
                       className="flex-1 rounded-xl border border-line py-2 text-xs font-medium text-destructive hover:bg-background"
                     >
@@ -168,23 +183,49 @@ export function AssetLibrary({
   );
 }
 
-function AssetForm({ initial, onCancel, onSave }: { initial: Asset; onCancel: () => void; onSave: (a: Asset) => void }) {
+function AssetForm({
+  initial,
+  isNew,
+  remote,
+  onCancel,
+  onSave,
+}: {
+  initial: Asset;
+  isNew: boolean;
+  remote: boolean;
+  onCancel: () => void;
+  onSave: (a: Asset) => Promise<void> | void;
+}) {
   const [a, setA] = useState<Asset>(initial);
+  const [warn, setWarn] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const meta = ASSET_TYPES[a.type];
 
   const upload = async (files: FileList | null) => {
     if (!files) return;
     const imgs = await Promise.all(
-      Array.from(files).map(async (f) => ({ id: newId("img"), url: await fileToDataUrl(f) })),
+      Array.from(files)
+        .filter((f) => /image\/(jpeg|png|webp)/.test(f.type))
+        .map(async (f) =>
+          remote
+            ? { id: newId("new"), url: URL.createObjectURL(f), file: f }
+            : { id: newId("img"), url: await fileToDataUrl(f) },
+        ),
     );
     setA((p) => ({ ...p, images: [...p.images, ...imgs], masterImageId: p.masterImageId ?? imgs[0]?.id ?? null }));
   };
 
-  const removeImg = (id: string) =>
+  const removeImg = (id: string) => {
+    if (a.masterImageId === id) {
+      setWarn("Đây là Master Image. Vui lòng chọn một ảnh khác làm Master trước khi xóa.");
+      return;
+    }
+    setWarn(null);
     setA((p) => {
       const images = p.images.filter((i) => i.id !== id);
       return { ...p, images, masterImageId: p.masterImageId === id ? (images[0]?.id ?? null) : p.masterImageId };
     });
+  };
 
   const valid = a.name.trim() && a.code.trim();
 
@@ -195,7 +236,7 @@ function AssetForm({ initial, onCancel, onSave }: { initial: Asset; onCancel: ()
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 font-display text-xl tracking-tight">
-          {initial.name ? `Chỉnh sửa: ${initial.name}` : meta.add.replace("+ ", "")}
+          {isNew ? meta.add.replace("+ ", "") : `Chỉnh sửa: ${initial.name}`}
         </h3>
 
         <p className="mb-2 text-sm font-medium">Ảnh tham chiếu</p>
