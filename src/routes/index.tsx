@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { SceneCard } from "@/components/SceneCard";
+import { AssetLibrary } from "@/components/AssetLibrary";
+import { AssetPicker } from "@/components/AssetPicker";
+import { useAssets } from "@/lib/assets";
 import {
   analyzeScript,
   emptyScene,
@@ -41,11 +44,20 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 
 const CAMERAS = ["Toàn cảnh", "Trung cảnh", "Cận cảnh", "Góc trên", "Góc thấp"];
 
+const LIB_TYPE = {
+  characters: "character",
+  locations: "location",
+  ingredients: "ingredient",
+  props: "prop",
+} as const;
+
 function StudioPage() {
   const [section, setSection] = useState<SectionId>("script");
   const [script, setScript] = useState(SAMPLE_SCRIPT);
   const [scenes, setScenes] = useState<Scene[]>(SAMPLE_SCENES);
   const [analyzing, setAnalyzing] = useState(false);
+  const [assets, setAssets] = useAssets();
+  const [pickFor, setPickFor] = useState<string | null>(null);
 
   const workspaceVisible = section === "script" || section === "storyboard";
 
@@ -215,6 +227,7 @@ function StudioPage() {
                       onChange={updateScene}
                       onDuplicate={() => duplicateScene(scene.id)}
                       onRegenerate={() => regenerateScene(scene.id)}
+                      onPickAssets={() => setPickFor(scene.id)}
                     />
                   ))}
                 </div>
@@ -222,22 +235,23 @@ function StudioPage() {
             </section>
           </div>
         ) : (
-          <div className="px-4 py-6 sm:px-8">
-            <div className="rise rounded-3xl border border-line bg-surface px-6 py-24 text-center">
-              <p className="font-display text-2xl tracking-tight">
-                {SECTIONS.find((s) => s.id === section)?.label}
-              </p>
-              <p className="mt-2 text-sm text-muted-ink">
-                Tính năng này sẽ được bổ sung ở phiên bản tiếp theo.
-              </p>
-              <button
-                onClick={() => setSection("storyboard")}
-                className="mt-6 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-background hover:bg-ink/90"
-              >
-                Quay lại Storyboard
-              </button>
-            </div>
-          </div>
+          <AssetLibrary
+            key={section}
+            type={LIB_TYPE[section as keyof typeof LIB_TYPE]}
+            assets={assets}
+            setAssets={setAssets}
+          />
+        )}
+        {pickFor && (
+          <AssetPicker
+            assets={assets}
+            selected={scenes.find((s) => s.id === pickFor)?.assets ?? []}
+            onClose={() => setPickFor(null)}
+            onSave={(v) => {
+              setScenes((prev) => prev.map((s) => (s.id === pickFor ? { ...s, assets: v } : s)));
+              setPickFor(null);
+            }}
+          />
         )}
       </div>
     </div>
