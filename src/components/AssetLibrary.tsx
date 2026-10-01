@@ -249,14 +249,14 @@ function AssetForm({
         </h3>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={a.type === "character" ? "Tên nhân vật *" : a.type === "location" ? "Tên bối cảnh *" : a.type === "ingredient" ? "Tên nguyên liệu *" : "Tên *"}>
+          <Field label={a.type === "character" ? "Tên nhân vật *" : a.type === "location" ? "Tên bối cảnh *" : a.type === "ingredient" ? "Tên nguyên liệu *" : "Tên đạo cụ *"}>
             <input className={input} value={a.name} onChange={(e) => setA({ ...a, name: e.target.value })} />
           </Field>
-          <Field label={a.type === "character" ? "Mã nhân vật *" : a.type === "location" ? "Mã bối cảnh *" : a.type === "ingredient" ? "Mã nguyên liệu *" : "Mã *"}>
+          <Field label={a.type === "character" ? "Mã nhân vật *" : a.type === "location" ? "Mã bối cảnh *" : a.type === "ingredient" ? "Mã nguyên liệu *" : "Mã đạo cụ *"}>
             <input
               className={`${input} font-mono`}
               value={a.code}
-              placeholder={a.type === "location" ? "VD: LOC_KITCHEN_001" : a.type === "ingredient" ? "VD: ING_GREEN_CHILI_001" : "VD: CHAR_GOLDEN_NY1"}
+              placeholder={a.type === "location" ? "VD: LOC_KITCHEN_001" : a.type === "ingredient" ? "VD: ING_GREEN_CHILI_001" : a.type === "prop" ? "VD: PROP_WOOD_STOVE_001" : "VD: CHAR_GOLDEN_NY1"}
               onChange={(e) => setA({ ...a, code: e.target.value.toUpperCase().replace(/\s+/g, "_") })}
             />
           </Field>
@@ -379,7 +379,7 @@ function AssetForm({
                 console.error("[save asset] failed", e);
                 const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "lỗi không xác định";
                 setWarn(
-                  `${a.type === "location" ? "Không thể lưu bối cảnh" : a.type === "ingredient" ? "Không thể lưu nguyên liệu" : "Không thể lưu"}. Vui lòng kiểm tra kết nối lưu trữ ảnh. (${msg})`,
+                  `${a.type === "location" ? "Không thể lưu bối cảnh" : a.type === "ingredient" ? "Không thể lưu nguyên liệu" : a.type === "prop" ? "Không thể lưu đạo cụ" : "Không thể lưu"}. Vui lòng kiểm tra kết nối lưu trữ ảnh. (${msg})`,
                 );
               } finally {
                 setSaving(false);
@@ -387,7 +387,7 @@ function AssetForm({
             }}
             className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground disabled:opacity-50"
           >
-            {saving ? "Đang lưu…" : isNew && a.type === "location" ? "Thêm bối cảnh" : isNew && a.type === "ingredient" ? "Thêm nguyên liệu" : "Lưu"}
+            {saving ? "Đang lưu…" : isNew && a.type === "location" ? "Thêm bối cảnh" : isNew && a.type === "ingredient" ? "Thêm nguyên liệu" : isNew && a.type === "prop" ? "Thêm đạo cụ" : "Lưu"}
           </button>
         </div>
       </div>
