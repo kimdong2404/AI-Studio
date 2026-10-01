@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Scene } from "./storyboard";
+import { SCENE_EXTRA_KEYS, type Scene } from "./storyboard";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -22,6 +22,7 @@ const row = (s: Scene, position: number) => ({
   camera: s.camera,
   duration: s.duration,
   location_id: s.location_id,
+  ...Object.fromEntries(SCENE_EXTRA_KEYS.map((k) => [k, s[k] ?? ""])),
 });
 
 export async function fetchScenes(): Promise<Scene[]> {
@@ -41,6 +42,7 @@ export async function fetchScenes(): Promise<Scene[]> {
       camera: r["camera"] ?? "",
       duration: r["duration"] ?? "",
       location_id: r["location_id"] ?? null,
+      ...(Object.fromEntries(SCENE_EXTRA_KEYS.map((k) => [k, r[k] ?? ""])) as Record<(typeof SCENE_EXTRA_KEYS)[number], string>),
       character_ids: [],
       ingredient_ids: [],
       prop_ids: [],

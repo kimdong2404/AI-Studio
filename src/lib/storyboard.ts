@@ -9,13 +9,24 @@ export type Scene = {
   duration: string;
   /** Reference IDs only — asset info is always read from the libraries. */
   location_id: string | null;
+  action: string;
+  expression: string;
+  camera_movement: string;
+  lighting: string;
+  time_of_day: string;
+  visual_style: string;
+  dialogue: string;
+  sound_effect: string;
+  ambient_sound: string;
+
   character_ids: string[];
   ingredient_ids: string[];
   prop_ids: string[];
 };
 
 export const nextId = () => crypto.randomUUID();
-const NO_LINKS = { location_id: null, character_ids: [], ingredient_ids: [], prop_ids: [] };
+export const SCENE_EXTRA_KEYS = ["action", "expression", "camera_movement", "lighting", "time_of_day", "visual_style", "dialogue", "sound_effect", "ambient_sound"] as const;
+const NO_LINKS = { action: "", expression: "", camera_movement: "", lighting: "", time_of_day: "", visual_style: "", dialogue: "", sound_effect: "", ambient_sound: "", location_id: null, character_ids: [], ingredient_ids: [], prop_ids: [] };
 
 export const SAMPLE_SCRIPT = `Cảnh 1: Một cô gái bước vào quán mì.
 Cảnh 2: Cô gọi một tô mì cay.
