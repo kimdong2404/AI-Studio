@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Asset, AssetType } from "./assets";
 
 /** Shared image bucket for all persistent asset libraries (one upload system). */
-const BUCKET = "character-images";
-const SIGN_SECONDS = 60 * 60 * 24 * 365;
+export const BUCKET = "character-images";
+export const SIGN_SECONDS = 60 * 60 * 24 * 365;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -25,7 +25,7 @@ const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_SIDE = 2560;
 
 /** Downscale/re-encode large images so they fit the storage size limit. */
-async function shrinkImage(file: File): Promise<File> {
+export async function shrinkImage(file: File): Promise<File> {
   if (file.size <= MAX_BYTES) return file;
   const bmp = await createImageBitmap(file);
   const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
