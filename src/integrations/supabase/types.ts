@@ -414,43 +414,70 @@ export type Database = {
       }
       scenes: {
         Row: {
+          action: string
+          ambient_sound: string
           camera: string
+          camera_movement: string
           character: string
           created_at: string
           description: string
+          dialogue: string
           duration: string
+          expression: string
           id: string
+          lighting: string
           location: string
           location_id: string | null
           position: number
           props: string
+          sound_effect: string
+          time_of_day: string
           title: string
+          visual_style: string
         }
         Insert: {
+          action?: string
+          ambient_sound?: string
           camera?: string
+          camera_movement?: string
           character?: string
           created_at?: string
           description?: string
+          dialogue?: string
           duration?: string
+          expression?: string
           id?: string
+          lighting?: string
           location?: string
           location_id?: string | null
           position?: number
           props?: string
+          sound_effect?: string
+          time_of_day?: string
           title?: string
+          visual_style?: string
         }
         Update: {
+          action?: string
+          ambient_sound?: string
           camera?: string
+          camera_movement?: string
           character?: string
           created_at?: string
           description?: string
+          dialogue?: string
           duration?: string
+          expression?: string
           id?: string
+          lighting?: string
           location?: string
           location_id?: string | null
           position?: number
           props?: string
+          sound_effect?: string
+          time_of_day?: string
           title?: string
+          visual_style?: string
         }
         Relationships: [
           {
