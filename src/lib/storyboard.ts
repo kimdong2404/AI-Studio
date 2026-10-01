@@ -1,5 +1,3 @@
-import type { SceneAsset } from "./assets";
-
 export type Scene = {
   id: string;
   title: string;
@@ -9,11 +7,15 @@ export type Scene = {
   props: string;
   camera: string;
   duration: string;
-  assets?: SceneAsset[];
+  /** Reference IDs only — asset info is always read from the libraries. */
+  location_id: string | null;
+  character_ids: string[];
+  ingredient_ids: string[];
+  prop_ids: string[];
 };
 
-let counter = 0;
-const nextId = () => `scene-${Date.now()}-${counter++}`;
+export const nextId = () => crypto.randomUUID();
+const NO_LINKS = { location_id: null, character_ids: [], ingredient_ids: [], prop_ids: [] };
 
 export const SAMPLE_SCRIPT = `Cảnh 1: Một cô gái bước vào quán mì.
 Cảnh 2: Cô gọi một tô mì cay.
@@ -21,69 +23,6 @@ Cảnh 3: Nhân viên chuẩn bị nguyên liệu.
 Cảnh 4: Nhân viên nấu mì.
 Cảnh 5: Tô mì cay hoàn thiện.
 Cảnh 6: Cô gái thưởng thức món ăn.`;
-
-export const SAMPLE_SCENES: Scene[] = [
-  {
-    id: "sample-1",
-    title: "Cô gái bước vào quán mì",
-    description: "Một cô gái trẻ đẩy cửa bước vào quán mì Việt Nam vào buổi chiều.",
-    character: "Cô gái",
-    location: "Quán mì",
-    props: "Túi xách",
-    camera: "Toàn cảnh",
-    duration: "4 giây",
-  },
-  {
-    id: "sample-2",
-    title: "Cô gái gọi một tô mì cay",
-    description: "Cô ngồi xuống bàn, nhìn thực đơn và gọi một tô mì cay.",
-    character: "Cô gái",
-    location: "Bàn ăn trong quán",
-    props: "Thực đơn",
-    camera: "Trung cảnh",
-    duration: "3 giây",
-  },
-  {
-    id: "sample-3",
-    title: "Nhân viên chuẩn bị nguyên liệu",
-    description: "Nhân viên bếp xếp thịt, rau thơm và ớt lên khay chuẩn bị nấu.",
-    character: "Nhân viên",
-    location: "Bếp quán",
-    props: "Rau thơm, ớt",
-    camera: "Cận cảnh",
-    duration: "4 giây",
-  },
-  {
-    id: "sample-4",
-    title: "Nhân viên nấu mì",
-    description: "Sợi mì được trụng trong nồi nước dùng đang sôi, khói bốc lên.",
-    character: "Nhân viên",
-    location: "Bếp quán",
-    props: "Nồi nước dùng",
-    camera: "Cận cảnh",
-    duration: "5 giây",
-  },
-  {
-    id: "sample-5",
-    title: "Tô mì cay hoàn thiện",
-    description: "Tô mì cay đỏ rực được đặt lên bàn gỗ, khói nghi ngút.",
-    character: "—",
-    location: "Bàn ăn trong quán",
-    props: "Tô mì, đũa",
-    camera: "Góc trên",
-    duration: "3 giây",
-  },
-  {
-    id: "sample-6",
-    title: "Cô gái thưởng thức món ăn",
-    description: "Cô gái gắp một đũa mì, mỉm cười hài lòng khi thưởng thức.",
-    character: "Cô gái",
-    location: "Bàn ăn trong quán",
-    props: "Đũa, khăn giấy",
-    camera: "Cận cảnh",
-    duration: "5 giây",
-  },
-];
 
 const CHARACTERS: Array<[RegExp, string]> = [
   [/cô gái|cô ấy|\bcô\b/i, "Cô gái"],
@@ -148,6 +87,7 @@ export function analyzeScript(script: string): Scene[] {
     props: match(PROPS, text, "—"),
     camera: CAMERAS[i % CAMERAS.length] ?? "Trung cảnh",
     duration: `${3 + (i % 3)} giây`,
+    ...NO_LINKS,
   }));
 
 }
@@ -162,5 +102,6 @@ export function emptyScene(index: number): Scene {
     props: "—",
     camera: "Trung cảnh",
     duration: "3 giây",
+    ...NO_LINKS,
   };
 }

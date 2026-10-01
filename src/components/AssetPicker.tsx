@@ -1,62 +1,50 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ASSET_TYPES, masterUrl, toSceneAsset, type Asset, type AssetType, type SceneAsset } from "@/lib/assets";
+import { ASSET_TYPES, masterUrl, type Asset, type AssetType } from "@/lib/assets";
 import { filterAssets, SearchBar } from "./AssetLibrary";
 
 export function AssetPicker({
+  type,
   assets,
-  selected,
+  selectedIds,
+  single,
   onClose,
   onSave,
 }: {
+  type: AssetType;
   assets: Asset[];
-  selected: SceneAsset[];
+  selectedIds: string[];
+  single?: boolean;
   onClose: () => void;
-  onSave: (v: SceneAsset[]) => void;
+  onSave: (ids: string[]) => void;
 }) {
-  const [tab, setTab] = useState<AssetType>("character");
   const [q, setQ] = useState("");
   const [by, setBy] = useState<"all" | "name" | "code">("all");
-  const [ids, setIds] = useState<Set<string>>(new Set(selected.map((s) => s.asset_id)));
-  const list = useMemo(() => filterAssets(assets.filter((a) => a.type === tab), q, by), [assets, tab, q, by]);
+  const [ids, setIds] = useState<string[]>(selectedIds);
+  const list = useMemo(() => filterAssets(assets.filter((a) => a.type === type), q, by), [assets, type, q, by]);
+  const label = ASSET_TYPES[type].label.toLowerCase();
 
   const toggle = (id: string) =>
-    setIds((p) => {
-      const n = new Set(p);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-
-  const save = () => {
-    // keep previously saved entries for assets that were deleted from library
-    const fromLib = assets.filter((a) => ids.has(a.id)).map(toSceneAsset);
-    const orphan = selected.filter((s) => ids.has(s.asset_id) && !assets.some((a) => a.id === s.asset_id));
-    onSave([...fromLib, ...orphan]);
-  };
+    setIds((p) => (p.includes(id) ? p.filter((x) => x !== id) : single ? [id] : [...p, id]));
 
   return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4" onClick={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-4 font-display text-xl tracking-tight">Chọn asset cho cảnh</h3>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {(Object.keys(ASSET_TYPES) as AssetType[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-ink text-background" : "border border-line"}`}
-            >
-              {ASSET_TYPES[t].icon} {ASSET_TYPES[t].label}
-            </button>
-          ))}
-        </div>
+        <h3 className="mb-1 font-display text-xl tracking-tight">
+          {ASSET_TYPES[type].icon} Chọn {label}
+        </h3>
+        <p className="mb-4 text-xs text-muted-ink">{single ? `Chọn 1 ${label} cho cảnh này.` : `Có thể chọn nhiều ${label}.`}</p>
         <div className="mb-4">
           <SearchBar q={q} setQ={setQ} by={by} setBy={setBy} />
         </div>
         <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
-          {list.length === 0 && <p className="col-span-full py-10 text-center text-sm text-muted-ink">Không có asset nào.</p>}
+          {list.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-muted-ink">
+              Chưa có {label} nào. Hãy thêm trong thư viện {label}.
+            </p>
+          )}
           {list.map((a) => {
-            const on = ids.has(a.id);
+            const on = ids.includes(a.id);
             const url = masterUrl(a);
             return (
               <button
@@ -75,17 +63,18 @@ export function AssetPicker({
                 <div className="p-2">
                   <p className="truncate text-sm font-semibold">{a.name}</p>
                   <p className="truncate font-mono text-[10px] text-muted-ink">{a.code}</p>
+                  {a.description && <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-ink">{a.description}</p>}
                 </div>
               </button>
             );
           })}
         </div>
         <div className="mt-5 flex items-center justify-end gap-2">
-          <span className="mr-auto text-xs text-muted-ink">Đã chọn {ids.size} asset</span>
+          <span className="mr-auto text-xs text-muted-ink">Đã chọn {ids.length}</span>
           <button onClick={onClose} className="rounded-full border border-line px-5 py-2.5 text-sm font-medium">
             Hủy
           </button>
-          <button onClick={save} className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground">
+          <button onClick={() => onSave(ids)} className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-accent-foreground">
             Xác nhận
           </button>
         </div>

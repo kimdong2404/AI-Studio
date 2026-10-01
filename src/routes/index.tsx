@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SceneCard } from "@/components/SceneCard";
 import { AssetLibrary } from "@/components/AssetLibrary";
-import { AssetPicker } from "@/components/AssetPicker";
-import { useAssets } from "@/lib/assets";
+import { deleteProp, saveProp, useProps } from "@/lib/props";
+import { fetchScenes, replaceScenes, saveOrder, saveScene } from "@/lib/scenes";
 import { deleteCharacter, saveCharacter, useCharacters } from "@/lib/characters";
 import { deleteLocation, saveLocation, useLocations } from "@/lib/locations";
 import { deleteIngredient, saveIngredient, useIngredients } from "@/lib/ingredients";
 import {
   analyzeScript,
   emptyScene,
-  SAMPLE_SCENES,
+  nextId,
   SAMPLE_SCRIPT,
   type Scene,
 } from "@/lib/storyboard";
@@ -57,14 +57,28 @@ const LIB_TYPE = {
 function StudioPage() {
   const [section, setSection] = useState<SectionId>("script");
   const [script, setScript] = useState(SAMPLE_SCRIPT);
-  const [scenes, setScenes] = useState<Scene[]>(SAMPLE_SCENES);
+  const [scenes, setScenes] = useState<Scene[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  const [localAssets, setAssets] = useAssets();
+  const [dbError, setDbError] = useState<string | null>(null);
   const characters = useCharacters();
   const locations = useLocations();
   const ingredients = useIngredients();
-  const assets = [...characters.list, ...locations.list, ...ingredients.list, ...localAssets];
-  const [pickFor, setPickFor] = useState<string | null>(null);
+  const props = useProps();
+  const assets = [...characters.list, ...locations.list, ...ingredients.list, ...props.list];
+
+  const run = async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+      setDbError(null);
+    } catch (e) {
+      console.error("[storyboard]", e);
+      setDbError(`Không thể lưu storyboard. ${e instanceof Error ? e.message : ""}`);
+    }
+  };
+
+  useEffect(() => {
+    void run(async () => setScenes(await fetchScenes()));
+  }, []);
 
   const workspaceVisible = section === "script" || section === "storyboard";
 
@@ -73,36 +87,43 @@ function StudioPage() {
     setAnalyzing(true);
     setSection("storyboard");
     window.setTimeout(() => {
-      setScenes(analyzeScript(script));
+      const next = analyzeScript(script);
+      setScenes(next);
       setAnalyzing(false);
+      void run(() => replaceScenes(next));
     }, 700);
   };
 
-  const updateScene = (updated: Scene) =>
+  const updateScene = async (updated: Scene) => {
+    const i = scenes.findIndex((s) => s.id === updated.id);
+    await saveScene(updated, i < 0 ? scenes.length : i);
     setScenes((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  };
 
-  const duplicateScene = (id: string) =>
-    setScenes((prev) => {
-      const i = prev.findIndex((s) => s.id === id);
-      const source = prev[i];
-      if (!source) return prev;
-      const copy: Scene = { ...source, id: `${source.id}-copy-${Date.now()}` };
-      return [...prev.slice(0, i + 1), copy, ...prev.slice(i + 1)];
+  const duplicateScene = (id: string) => {
+    const i = scenes.findIndex((s) => s.id === id);
+    const source = scenes[i];
+    if (!source) return;
+    const copy: Scene = { ...source, id: nextId() };
+    const next = [...scenes.slice(0, i + 1), copy, ...scenes.slice(i + 1)];
+    setScenes(next);
+    void run(async () => {
+      await saveScene(copy, i + 1);
+      await saveOrder(next);
     });
+  };
 
-  const regenerateScene = (id: string) =>
-    setScenes((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? {
-              ...s,
-              camera: CAMERAS[(CAMERAS.indexOf(s.camera) + 1) % CAMERAS.length] ?? s.camera,
-              duration: `${3 + ((parseInt(s.duration, 10) || 3) % 4)} giây`,
-            }
-          : s,
-      ),
-    );
-
+  const regenerateScene = (id: string) => {
+    const s = scenes.find((x) => x.id === id);
+    if (!s) return;
+    const upd = {
+      ...s,
+      camera: CAMERAS[(CAMERAS.indexOf(s.camera) + 1) % CAMERAS.length] ?? s.camera,
+      duration: `${3 + ((parseInt(s.duration, 10) || 3) % 4)} giây`,
+    };
+    setScenes((prev) => prev.map((x) => (x.id === id ? upd : x)));
+    void run(() => saveScene(upd, scenes.indexOf(s)));
+  };
 
   return (
     <div className="min-h-screen bg-background font-body text-ink antialiased">
@@ -194,7 +215,11 @@ function StudioPage() {
                 <span className="font-mono text-[11px] text-muted-ink">02</span>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => setScenes((p) => [...p, emptyScene(p.length + 1)])}
+                    onClick={() => {
+                      const n = emptyScene(scenes.length + 1);
+                      setScenes((p) => [...p, n]);
+                      void run(() => saveScene(n, scenes.length));
+                    }}
                     className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-background hover:bg-ink/90"
                   >
                     + Thêm cảnh
@@ -206,7 +231,10 @@ function StudioPage() {
                     Phân tích lại
                   </button>
                   <button
-                    onClick={() => setScenes([])}
+                    onClick={() => {
+                      setScenes([]);
+                      void run(() => replaceScenes([]));
+                    }}
                     className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-muted-ink hover:bg-background"
                   >
                     Xóa tất cả
@@ -214,6 +242,9 @@ function StudioPage() {
                 </div>
               </div>
 
+              {dbError && (
+                <p className="mb-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{dbError}</p>
+              )}
               {scenes.length === 0 ? (
                 <div className="rounded-3xl border border-line bg-surface px-6 py-20 text-center">
                   <p className="font-display text-xl tracking-tight">
@@ -231,10 +262,10 @@ function StudioPage() {
                       scene={scene}
                       index={i}
                       delay={60 * (i + 1)}
-                      onChange={updateScene}
+                      assets={assets}
+                      onSave={updateScene}
                       onDuplicate={() => duplicateScene(scene.id)}
                       onRegenerate={() => regenerateScene(scene.id)}
-                      onPickAssets={() => setPickFor(scene.id)}
                     />
                   ))}
                 </div>
@@ -246,7 +277,7 @@ function StudioPage() {
             key={section}
             type={LIB_TYPE[section as keyof typeof LIB_TYPE]}
             assets={assets}
-            setAssets={setAssets}
+            setAssets={() => {}}
             remote={
               section === "characters"
                 ? {
@@ -281,19 +312,17 @@ function StudioPage() {
                           await ingredients.reload();
                         },
                       }
-                    : undefined
+                    : {
+                        save: async (a, prev) => {
+                          await saveProp(a, prev);
+                          await props.reload();
+                        },
+                        remove: async (a) => {
+                          await deleteProp(a);
+                          await props.reload();
+                        },
+                      }
             }
-          />
-        )}
-        {pickFor && (
-          <AssetPicker
-            assets={assets}
-            selected={scenes.find((s) => s.id === pickFor)?.assets ?? []}
-            onClose={() => setPickFor(null)}
-            onSave={(v) => {
-              setScenes((prev) => prev.map((s) => (s.id === pickFor ? { ...s, assets: v } : s)));
-              setPickFor(null);
-            }}
           />
         )}
       </div>
