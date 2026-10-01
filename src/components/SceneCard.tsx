@@ -1,15 +1,16 @@
 import { useState } from "react";
 import type { Scene } from "@/lib/storyboard";
-import { ASSET_TYPES, type AssetType } from "@/lib/assets";
+import { masterUrl, type Asset, type AssetType } from "@/lib/assets";
+import { AssetPicker } from "./AssetPicker";
 
 type Props = {
   scene: Scene;
   index: number;
   delay: number;
-  onChange: (scene: Scene) => void;
+  assets: Asset[];
+  onSave: (scene: Scene) => Promise<void>;
   onDuplicate: () => void;
   onRegenerate: () => void;
-  onPickAssets: () => void;
 };
 
 type TextKey = "character" | "location" | "props" | "camera" | "duration";
@@ -21,15 +22,52 @@ const FIELDS: Array<{ key: TextKey; label: string; wide?: boolean }> = [
   { key: "duration", label: "Thời lượng", wide: true },
 ];
 
-export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegenerate, onPickAssets }: Props) {
-  const sceneAssets = scene.assets ?? [];
-  const [editing, setEditing] = useState(false);
+const GROUPS: Array<{ type: AssetType; icon: string; label: string; pick: string }> = [
+  { type: "character", icon: "👤", label: "Nhân vật", pick: "+ Chọn nhân vật" },
+  { type: "location", icon: "🏠", label: "Bối cảnh", pick: "+ Chọn bối cảnh" },
+  { type: "ingredient", icon: "🍜", label: "Nguyên liệu", pick: "+ Chọn nguyên liệu" },
+  { type: "prop", icon: "🎒", label: "Đạo cụ", pick: "+ Chọn đạo cụ" },
+];
+
+function idsOf(s: Scene, t: AssetType): string[] {
+  if (t === "character") return s.character_ids;
+  if (t === "ingredient") return s.ingredient_ids;
+  if (t === "prop") return s.prop_ids;
+  return s.location_id ? [s.location_id] : [];
+}
+
+function withIds(s: Scene, t: AssetType, ids: string[]): Scene {
+  if (t === "character") return { ...s, character_ids: ids };
+  if (t === "ingredient") return { ...s, ingredient_ids: ids };
+  if (t === "prop") return { ...s, prop_ids: ids };
+  return { ...s, location_id: ids[0] ?? null };
+}
+
+export function SceneCard({ scene, index, delay, assets, onSave, onDuplicate, onRegenerate }: Props) {
+  const [draft, setDraft] = useState<Scene | null>(null);
+  const [picking, setPicking] = useState<AssetType | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const byId = new Map(assets.map((a) => [a.id, a]));
+  const resolve = (s: Scene, t: AssetType) => idsOf(s, t).map((id) => byId.get(id)).filter(Boolean) as Asset[];
+
+  const save = async () => {
+    if (!draft) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave(draft);
+      setDraft(null);
+    } catch (e) {
+      console.error("[scene save]", e);
+      setErr(`Không thể lưu cảnh. ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <article
-      className="rise overflow-hidden rounded-3xl border border-line bg-surface"
-      style={{ animationDelay: `${delay}ms` }}
-    >
+    <article className="rise overflow-hidden rounded-3xl border border-line bg-surface" style={{ animationDelay: `${delay}ms` }}>
       <div className="relative">
         <div className="grid aspect-[16/9] w-full place-items-center bg-background outline-1 -outline-offset-1 outline-ink/5">
           <div className="flex flex-col items-center gap-2 text-muted-ink/60">
@@ -46,17 +84,17 @@ export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegene
       </div>
 
       <div className="p-4">
-        {editing ? (
+        {draft ? (
           <div className="space-y-2">
             <input
-              value={scene.title}
-              onChange={(e) => onChange({ ...scene, title: e.target.value })}
+              value={draft.title}
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
               className="w-full rounded-xl border border-line bg-background px-3 py-2 text-sm font-semibold focus:border-accent focus:outline-none"
               placeholder="Tiêu đề cảnh"
             />
             <textarea
-              value={scene.description}
-              onChange={(e) => onChange({ ...scene, description: e.target.value })}
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               rows={2}
               className="w-full resize-none rounded-xl border border-line bg-background px-3 py-2 text-xs leading-relaxed focus:border-accent focus:outline-none"
               placeholder="Mô tả cảnh"
@@ -65,13 +103,59 @@ export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegene
               {FIELDS.map(({ key, label }) => (
                 <input
                   key={key}
-                  value={scene[key]}
-                  onChange={(e) => onChange({ ...scene, [key]: e.target.value })}
+                  value={draft[key]}
+                  onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
                   className="w-full rounded-xl border border-line bg-background px-3 py-2 text-xs focus:border-accent focus:outline-none"
                   placeholder={label}
                 />
               ))}
             </div>
+            <div className="space-y-2 pt-2">
+              {GROUPS.map((g) => {
+                const items = resolve(draft, g.type);
+                return (
+                  <div key={g.type} className="rounded-2xl border border-line bg-background p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold">
+                        {g.icon} {g.label}
+                      </span>
+                      <button
+                        onClick={() => setPicking(g.type)}
+                        className="rounded-full bg-accent-soft px-3 py-1 text-[11px] font-semibold text-accent hover:bg-accent/20"
+                      >
+                        {g.type === "location" && items.length ? "Đổi bối cảnh" : g.pick}
+                      </button>
+                    </div>
+                    {items.length === 0 ? (
+                      <p className="text-[11px] text-muted-ink">Chưa chọn.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {items.map((a) => {
+                          const url = masterUrl(a);
+                          return (
+                            <span key={a.id} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1 pl-1 pr-1.5">
+                              {url ? <img src={url} alt="" className="size-7 rounded object-cover" /> : <span className="size-7 rounded bg-background" />}
+                              <span className="text-[11px] font-medium leading-tight">
+                                {a.name}
+                                <span className="block font-mono text-[9px] text-muted-ink">{a.code}</span>
+                              </span>
+                              <button
+                                title="Xóa khỏi cảnh"
+                                onClick={() => setDraft(withIds(draft, g.type, idsOf(draft, g.type).filter((x) => x !== a.id)))}
+                                className="ml-1 grid size-5 place-items-center rounded-full text-xs text-muted-ink hover:bg-background hover:text-ink"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {err && <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
           </div>
         ) : (
           <>
@@ -85,65 +169,69 @@ export function SceneCard({ scene, index, delay, onChange, onDuplicate, onRegene
                 </div>
               ))}
             </dl>
-          </>
-        )}
-
-        <div className="mt-4 rounded-2xl border border-line bg-background p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold">Asset sử dụng</span>
-            <button onClick={onPickAssets} className="rounded-full bg-accent-soft px-3 py-1 text-[11px] font-semibold text-accent hover:bg-accent/20">
-              + Chọn asset
-            </button>
-          </div>
-          {sceneAssets.length === 0 ? (
-            <p className="text-[11px] text-muted-ink">Chưa chọn asset nào.</p>
-          ) : (
-            <div className="space-y-2">
-              {(Object.keys(ASSET_TYPES) as AssetType[]).map((t) => {
-                const items = sceneAssets.filter((a) => a.asset_type === t);
-                if (!items.length) return null;
+            <div className="mt-4 space-y-1 rounded-2xl border border-line bg-background p-3 text-xs">
+              {GROUPS.map((g) => {
+                const items = resolve(scene, g.type);
+                const first = items[0];
                 return (
-                  <div key={t}>
-                    <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-ink">{ASSET_TYPES[t].label}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {items.map((a) => (
-                        <span key={a.asset_id} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1 pl-1 pr-2">
-                          {a.master_image && <img src={a.master_image} alt="" className="size-6 rounded object-cover" />}
-                          <span className="text-[11px] font-medium leading-tight">
-                            {a.asset_name}
-                            <span className="block font-mono text-[9px] text-muted-ink">{a.asset_code}</span>
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <p key={g.type} className="flex items-center gap-1.5 truncate">
+                    <span>{g.icon}</span>
+                    <span className="text-muted-ink">{g.label}:</span>
+                    {first ? (
+                      <>
+                        {masterUrl(first) && <img src={masterUrl(first)!} alt="" className="size-5 rounded object-cover" />}
+                        <span className="truncate font-medium">{first.name}</span>
+                        {items.length > 1 && <span className="text-muted-ink">+ {items.length - 1}</span>}
+                      </>
+                    ) : (
+                      <span className="text-muted-ink/70">—</span>
+                    )}
+                  </p>
                 );
               })}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         <div className="mt-4 flex gap-2">
-          <button
-            onClick={() => setEditing((v) => !v)}
-            className="flex-1 rounded-xl border border-line py-2 text-xs font-medium hover:bg-background"
-          >
-            {editing ? "Xong" : "Chỉnh sửa"}
-          </button>
-          <button
-            onClick={onDuplicate}
-            className="flex-1 rounded-xl border border-line py-2 text-xs font-medium hover:bg-background"
-          >
-            Sao chép
-          </button>
-          <button
-            onClick={onRegenerate}
-            className="flex-1 rounded-xl bg-accent-soft py-2 text-xs font-semibold text-accent hover:bg-accent/20"
-          >
-            Tạo lại
-          </button>
+          {draft ? (
+            <>
+              <button onClick={() => setDraft(null)} disabled={saving} className="flex-1 rounded-xl border border-line py-2 text-xs font-medium hover:bg-background">
+                Hủy
+              </button>
+              <button onClick={save} disabled={saving} className="flex-1 rounded-xl bg-accent py-2 text-xs font-semibold text-accent-foreground disabled:opacity-60">
+                {saving ? "Đang lưu…" : "Lưu"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setDraft(scene)} className="flex-1 rounded-xl border border-line py-2 text-xs font-medium hover:bg-background">
+                Chỉnh sửa
+              </button>
+              <button onClick={onDuplicate} className="flex-1 rounded-xl border border-line py-2 text-xs font-medium hover:bg-background">
+                Sao chép
+              </button>
+              <button onClick={onRegenerate} className="flex-1 rounded-xl bg-accent-soft py-2 text-xs font-semibold text-accent hover:bg-accent/20">
+                Tạo lại
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      {picking && draft && (
+        <AssetPicker
+          type={picking}
+          assets={assets}
+          single={picking === "location"}
+          selectedIds={idsOf(draft, picking)}
+          onClose={() => setPicking(null)}
+          onSave={(ids) => {
+            setDraft(withIds(draft, picking, ids));
+            setPicking(null);
+          }}
+        />
+      )}
     </article>
   );
 }
