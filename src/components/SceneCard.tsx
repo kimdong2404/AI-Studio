@@ -29,6 +29,33 @@ const GROUPS: Array<{ type: AssetType; icon: string; label: string; pick: string
   { type: "prop", icon: "🎒", label: "Đạo cụ", pick: "+ Chọn đạo cụ" },
 ];
 
+type ExtraKey = "camera" | "action" | "expression" | "camera_movement" | "lighting" | "time_of_day" | "visual_style" | "dialogue" | "sound_effect" | "ambient_sound";
+type FieldDef = { key: ExtraKey; label: string; options?: string[]; long?: boolean; ph?: string };
+const SECTIONS: Array<{ n: string; t: string; fields: FieldDef[] }> = [
+  { n: "③", t: "Hành động & diễn xuất", fields: [
+    { key: "action", label: "Hành động", long: true, ph: "VD: Mèo bước vào vườn, nhìn quanh rồi tiến đến luống cải." },
+    { key: "expression", label: "Biểu cảm / trạng thái", ph: "VD: Vui vẻ, tò mò" },
+  ] },
+  { n: "④", t: "Camera", fields: [
+    { key: "camera", label: "Góc máy", options: ["Toàn cảnh", "Toàn thân", "Trung cảnh", "Cận cảnh", "Cực cận", "Góc thấp", "Góc cao", "Over-the-shoulder", "POV"] },
+    { key: "camera_movement", label: "Chuyển động camera", options: ["Không có / Static", "Pan left", "Pan right", "Tilt up", "Tilt down", "Zoom in", "Zoom out", "Tracking", "Dolly in", "Dolly out", "Handheld"] },
+  ] },
+  { n: "⑤", t: "Hình ảnh", fields: [
+    { key: "lighting", label: "Ánh sáng", options: ["Ánh sáng tự nhiên", "Nắng sớm", "Nắng chiều", "Ánh sáng mềm", "Ánh sáng mạnh", "Ánh sáng trong nhà", "Ánh sáng điện", "Dramatic lighting", "Cinematic lighting"] },
+    { key: "time_of_day", label: "Thời gian trong ngày", options: ["Bình minh", "Buổi sáng", "Trưa", "Chiều", "Hoàng hôn", "Buổi tối", "Đêm"] },
+    { key: "visual_style", label: "Phong cách hình ảnh", options: ["Realistic", "Photorealistic", "Cinematic", "Documentary", "Rustic Vietnamese countryside", "Food commercial", "Anime", "3D animation"] },
+  ] },
+  { n: "⑥", t: "Âm thanh", fields: [
+    { key: "dialogue", label: "Lời thoại", long: true, ph: "Có thể để trống" },
+    { key: "sound_effect", label: "Hiệu ứng âm thanh", ph: "Có thể để trống" },
+    { key: "ambient_sound", label: "Âm thanh môi trường", ph: "VD: Tiếng chim và tiếng lá cây" },
+  ] },
+];
+
+function Heading({ n, t }: { n: string; t: string }) {
+  return <p className="pt-3 text-xs font-semibold uppercase tracking-wider text-ink">{n} {t}</p>;
+}
+
 function idsOf(s: Scene, t: AssetType): string[] {
   if (t === "character") return s.character_ids ?? [];
   if (t === "ingredient") return s.ingredient_ids ?? [];
@@ -86,6 +113,7 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
       <div className="p-4">
         {draft ? (
           <div className="space-y-2">
+            <Heading n="①" t="Thông tin cảnh" />
             <input
               value={draft.title}
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
@@ -100,7 +128,7 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
               placeholder="Mô tả cảnh"
             />
             <div className="grid grid-cols-2 gap-2">
-              {FIELDS.map(({ key, label }) => (
+              {FIELDS.filter((f) => f.key !== "camera").map(({ key, label }) => (
                 <input
                   key={key}
                   value={draft[key]}
@@ -110,7 +138,8 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
                 />
               ))}
             </div>
-            <div className="space-y-2 pt-2">
+            <Heading n="②" t="Tài sản tham chiếu" />
+            <div className="space-y-2">
               {GROUPS.map((g) => {
                 const items = resolve(draft, g.type);
                 return (
@@ -155,6 +184,42 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
                 );
               })}
             </div>
+            {SECTIONS.map((sec) => (
+              <div key={sec.n} className="space-y-2">
+                <Heading n={sec.n} t={sec.t} />
+                {sec.fields.map((f) => (
+                  <label key={f.key} className="block">
+                    <span className="mb-1 block text-[11px] text-muted-ink">{f.label}</span>
+                    {f.long ? (
+                      <textarea
+                        rows={2}
+                        value={draft[f.key] ?? ""}
+                        onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                        placeholder={f.ph}
+                        className="w-full resize-none rounded-xl border border-line bg-background px-3 py-2 text-xs leading-relaxed focus:border-accent focus:outline-none"
+                      />
+                    ) : (
+                      <>
+                        <input
+                          list={f.options ? `opt-${f.key}` : undefined}
+                          value={draft[f.key] ?? ""}
+                          onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                          placeholder={f.options ? "Chọn hoặc nhập tùy chỉnh" : f.ph}
+                          className="w-full rounded-xl border border-line bg-background px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                        />
+                        {f.options && (
+                          <datalist id={`opt-${f.key}`}>
+                            {f.options.map((o) => (
+                              <option key={o} value={o} />
+                            ))}
+                          </datalist>
+                        )}
+                      </>
+                    )}
+                  </label>
+                ))}
+              </div>
+            ))}
             {err && <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
           </div>
         ) : (
@@ -169,6 +234,12 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
                 </div>
               ))}
             </dl>
+            {(scene.action || scene.camera_movement) && (
+              <div className="mt-3 space-y-1 text-xs">
+                {scene.action && <p className="line-clamp-2"><span className="text-muted-ink">🎬 Hành động:</span> {scene.action}</p>}
+                <p><span className="text-muted-ink">🎥 Camera:</span> {[scene.camera, scene.camera_movement].filter(Boolean).join(" · ")}</p>
+              </div>
+            )}
             <div className="mt-4 space-y-1 rounded-2xl border border-line bg-background p-3 text-xs">
               {GROUPS.map((g) => {
                 const items = resolve(scene, g.type);
