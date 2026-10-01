@@ -14,6 +14,94 @@ export type Database = {
   }
   public: {
     Tables: {
+      character_expression_images: {
+        Row: {
+          created_at: string
+          expression_id: string
+          id: string
+          image_url: string
+          is_master: boolean
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          expression_id: string
+          id?: string
+          image_url: string
+          is_master?: boolean
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          expression_id?: string
+          id?: string
+          image_url?: string
+          is_master?: boolean
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_expression_images_expression_id_fkey"
+            columns: ["expression_id"]
+            isOneToOne: false
+            referencedRelation: "character_expressions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_expressions: {
+        Row: {
+          brows_ears: string
+          character_id: string
+          code: string
+          created_at: string
+          description: string
+          eyes: string
+          facial_features: string
+          head_pose: string
+          id: string
+          mouth: string
+          name: string
+          notes: string
+        }
+        Insert: {
+          brows_ears?: string
+          character_id: string
+          code?: string
+          created_at?: string
+          description?: string
+          eyes?: string
+          facial_features?: string
+          head_pose?: string
+          id?: string
+          mouth?: string
+          name: string
+          notes?: string
+        }
+        Update: {
+          brows_ears?: string
+          character_id?: string
+          code?: string
+          created_at?: string
+          description?: string
+          eyes?: string
+          facial_features?: string
+          head_pose?: string
+          id?: string
+          mouth?: string
+          name?: string
+          notes?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_expressions_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_images: {
         Row: {
           character_id: string
@@ -22,6 +110,7 @@ export type Database = {
           image_url: string
           is_master: boolean
           storage_path: string
+          view_type: string
         }
         Insert: {
           character_id: string
@@ -30,6 +119,7 @@ export type Database = {
           image_url: string
           is_master?: boolean
           storage_path: string
+          view_type?: string
         }
         Update: {
           character_id?: string
@@ -38,12 +128,141 @@ export type Database = {
           image_url?: string
           is_master?: boolean
           storage_path?: string
+          view_type?: string
         }
         Relationships: [
           {
             foreignKeyName: "character_images_character_id_fkey"
             columns: ["character_id"]
             isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_sheets: {
+        Row: {
+          accessories: string
+          appearance_description: string
+          appearance_lock: string
+          behavior: string
+          body_features: string
+          breed: string
+          build: string
+          character_id: string
+          character_identity: string
+          consistency_instruction: string
+          created_at: string
+          demeanor: string
+          ears: string
+          eye_color: string
+          face_shape: string
+          footwear: string
+          hair_color: string
+          height: string
+          id: string
+          identity_description: string
+          important_details: string
+          mouth: string
+          negative_avoid_changes: string
+          nose: string
+          outfit_color: string
+          outfit_description: string
+          outfit_details: string
+          outfit_lock: string
+          outfit_main: string
+          outfit_style: string
+          overall_color: string
+          pattern: string
+          personality: string
+          special_marks: string
+          species: string
+          updated_at: string
+          usual_expression: string
+        }
+        Insert: {
+          accessories?: string
+          appearance_description?: string
+          appearance_lock?: string
+          behavior?: string
+          body_features?: string
+          breed?: string
+          build?: string
+          character_id: string
+          character_identity?: string
+          consistency_instruction?: string
+          created_at?: string
+          demeanor?: string
+          ears?: string
+          eye_color?: string
+          face_shape?: string
+          footwear?: string
+          hair_color?: string
+          height?: string
+          id?: string
+          identity_description?: string
+          important_details?: string
+          mouth?: string
+          negative_avoid_changes?: string
+          nose?: string
+          outfit_color?: string
+          outfit_description?: string
+          outfit_details?: string
+          outfit_lock?: string
+          outfit_main?: string
+          outfit_style?: string
+          overall_color?: string
+          pattern?: string
+          personality?: string
+          special_marks?: string
+          species?: string
+          updated_at?: string
+          usual_expression?: string
+        }
+        Update: {
+          accessories?: string
+          appearance_description?: string
+          appearance_lock?: string
+          behavior?: string
+          body_features?: string
+          breed?: string
+          build?: string
+          character_id?: string
+          character_identity?: string
+          consistency_instruction?: string
+          created_at?: string
+          demeanor?: string
+          ears?: string
+          eye_color?: string
+          face_shape?: string
+          footwear?: string
+          hair_color?: string
+          height?: string
+          id?: string
+          identity_description?: string
+          important_details?: string
+          mouth?: string
+          negative_avoid_changes?: string
+          nose?: string
+          outfit_color?: string
+          outfit_description?: string
+          outfit_details?: string
+          outfit_lock?: string
+          outfit_main?: string
+          outfit_style?: string
+          overall_color?: string
+          pattern?: string
+          personality?: string
+          special_marks?: string
+          species?: string
+          updated_at?: string
+          usual_expression?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_sheets_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: true
             referencedRelation: "characters"
             referencedColumns: ["id"]
           },
@@ -308,18 +527,21 @@ export type Database = {
         Row: {
           character_id: string
           created_at: string
+          expression_id: string | null
           id: string
           scene_id: string
         }
         Insert: {
           character_id: string
           created_at?: string
+          expression_id?: string | null
           id?: string
           scene_id: string
         }
         Update: {
           character_id?: string
           created_at?: string
+          expression_id?: string | null
           id?: string
           scene_id?: string
         }
@@ -329,6 +551,13 @@ export type Database = {
             columns: ["character_id"]
             isOneToOne: false
             referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scene_characters_expression_id_fkey"
+            columns: ["expression_id"]
+            isOneToOne: false
+            referencedRelation: "character_expressions"
             referencedColumns: ["id"]
           },
           {
