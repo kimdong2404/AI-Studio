@@ -28,7 +28,7 @@ const row = (s: Scene, position: number) => ({
 export async function fetchScenes(): Promise<Scene[]> {
   const [sc, ...links] = await Promise.all([
     db.from("scenes").select("*").order("position").order("created_at"),
-    ...LINKS.map((l) => db.from(l.table).select(`scene_id, ${l.col}`)),
+    ...LINKS.map((l) => db.from(l.table).select(l.table === "scene_characters" ? "scene_id, character_id, expression_id" : `scene_id, ${l.col}`)),
   ]);
   for (const r of [sc, ...links]) if (r.error) throw r.error;
   return (sc.data as Record<string, string | null>[]).map((r) => {
@@ -44,6 +44,7 @@ export async function fetchScenes(): Promise<Scene[]> {
       location_id: r["location_id"] ?? null,
       ...(Object.fromEntries(SCENE_EXTRA_KEYS.map((k) => [k, r[k] ?? ""])) as Record<(typeof SCENE_EXTRA_KEYS)[number], string>),
       character_ids: [],
+      character_expressions: {},
       ingredient_ids: [],
       prop_ids: [],
     };
@@ -52,6 +53,9 @@ export async function fetchScenes(): Promise<Scene[]> {
         .filter((x) => x["scene_id"] === s.id)
         .map((x) => x[l.col] as string);
     });
+    for (const x of links[0].data as Record<string, string | null>[]) {
+      if (x["scene_id"] === s.id) s.character_expressions[x["character_id"] as string] = x["expression_id"] ?? null;
+    }
     return s;
   });
 }
@@ -69,6 +73,16 @@ export async function saveScene(s: Scene, position: number) {
     if (drop.length) {
       const { error: e2 } = await db.from(l.table).delete().in("id", drop);
       if (e2) throw e2;
+    }
+    if (l.table === "scene_characters") {
+      if (ids.length) {
+        const { error: e4 } = await db.from(l.table).upsert(
+          ids.map((id) => ({ scene_id: s.id, character_id: id, expression_id: s.character_expressions?.[id] ?? null })),
+          { onConflict: "scene_id,character_id" },
+        );
+        if (e4) throw e4;
+      }
+      continue;
     }
     const add = ids.filter((id) => !existing.some((x) => x[l.col] === id));
     if (add.length) {

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { SceneCard } from "@/components/SceneCard";
 import { AssetLibrary } from "@/components/AssetLibrary";
 import { deleteProp, saveProp, useProps } from "@/lib/props";
+import { fetchAllExpressionsLite, type ExpressionLite } from "@/lib/characterSheet";
 import { fetchScenes, replaceScenes, saveOrder, saveScene } from "@/lib/scenes";
 import { deleteCharacter, saveCharacter, useCharacters } from "@/lib/characters";
 import { deleteLocation, saveLocation, useLocations } from "@/lib/locations";
@@ -79,6 +80,10 @@ function StudioPage() {
   useEffect(() => {
     void run(async () => setScenes(await fetchScenes()));
   }, []);
+  const [expressions, setExpressions] = useState<ExpressionLite[]>([]);
+  useEffect(() => {
+    void fetchAllExpressionsLite().then(setExpressions).catch((e) => console.error("[expressions]", e));
+  }, [section]);
 
   const workspaceVisible = section === "script" || section === "storyboard";
 
@@ -263,6 +268,7 @@ function StudioPage() {
                       index={i}
                       delay={60 * (i + 1)}
                       assets={assets}
+                      expressions={expressions}
                       onSave={updateScene}
                       onDuplicate={() => duplicateScene(scene.id)}
                       onRegenerate={() => regenerateScene(scene.id)}
