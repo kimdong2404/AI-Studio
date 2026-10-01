@@ -30,9 +30,9 @@ const GROUPS: Array<{ type: AssetType; icon: string; label: string; pick: string
 ];
 
 function idsOf(s: Scene, t: AssetType): string[] {
-  if (t === "character") return s.character_ids;
-  if (t === "ingredient") return s.ingredient_ids;
-  if (t === "prop") return s.prop_ids;
+  if (t === "character") return s.character_ids ?? [];
+  if (t === "ingredient") return s.ingredient_ids ?? [];
+  if (t === "prop") return s.prop_ids ?? [];
   return s.location_id ? [s.location_id] : [];
 }
 
@@ -43,7 +43,7 @@ function withIds(s: Scene, t: AssetType, ids: string[]): Scene {
   return { ...s, location_id: ids[0] ?? null };
 }
 
-export function SceneCard({ scene, index, delay, assets, onSave, onDuplicate, onRegenerate }: Props) {
+export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicate, onRegenerate }: Props) {
   const [draft, setDraft] = useState<Scene | null>(null);
   const [picking, setPicking] = useState<AssetType | null>(null);
   const [saving, setSaving] = useState(false);
