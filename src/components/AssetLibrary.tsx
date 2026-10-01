@@ -229,7 +229,7 @@ function AssetForm({
   onSave,
   onOpenSheet,
 }: {
-  onOpenSheet?: () => void;
+  onOpenSheet?: (() => void) | undefined;
   initial: Asset;
   isNew: boolean;
   remote: boolean;

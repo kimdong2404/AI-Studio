@@ -24,7 +24,7 @@ function Head({ children }: { children: React.ReactNode }) {
   return <h4 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider">{children}</h4>;
 }
 
-function Txt({ label, value, onChange, long }: { label: string; value: string; onChange: (v: string) => void; long?: boolean }) {
+function Txt({ label, value, onChange, long }: { label: string; value: string; onChange: (v: string) => void; long?: boolean | undefined }) {
   return (
     <label className={`block ${long ? "sm:col-span-2" : ""}`}>
       <span className="mb-1 block text-[11px] text-muted-ink">{label}</span>
@@ -37,7 +37,7 @@ function Txt({ label, value, onChange, long }: { label: string; value: string; o
   );
 }
 
-export function CharacterSheet({ character, onClose, onChanged }: { character: Asset; onClose: () => void; onChanged?: () => void }) {
+export function CharacterSheet({ character, onClose, onChanged }: { character: Asset; onClose: () => void; onChanged?: (() => void) | undefined }) {
   const [sheet, setSheet] = useState<Sheet>({});
   const [exprs, setExprs] = useState<Expression[]>([]);
   const [views, setViews] = useState<Record<string, string>>({});
