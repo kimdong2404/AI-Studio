@@ -2,12 +2,14 @@ import { useState } from "react";
 import type { Scene } from "@/lib/storyboard";
 import { masterUrl, type Asset, type AssetType } from "@/lib/assets";
 import { AssetPicker } from "./AssetPicker";
+import type { ExpressionLite } from "@/lib/characterSheet";
 
 type Props = {
   scene: Scene;
   index: number;
   delay: number;
   assets: Asset[];
+  expressions?: ExpressionLite[];
   onSave: (scene: Scene) => Promise<void>;
   onDuplicate: () => void;
   onRegenerate: () => void;
@@ -64,13 +66,16 @@ function idsOf(s: Scene, t: AssetType): string[] {
 }
 
 function withIds(s: Scene, t: AssetType, ids: string[]): Scene {
-  if (t === "character") return { ...s, character_ids: ids };
+  if (t === "character") {
+    const ce = Object.fromEntries(Object.entries(s.character_expressions ?? {}).filter(([k]) => ids.includes(k)));
+    return { ...s, character_ids: ids, character_expressions: ce };
+  }
   if (t === "ingredient") return { ...s, ingredient_ids: ids };
   if (t === "prop") return { ...s, prop_ids: ids };
   return { ...s, location_id: ids[0] ?? null };
 }
 
-export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicate, onRegenerate }: Props) {
+export function SceneCard({ scene, index, delay, assets = [], expressions = [], onSave, onDuplicate, onRegenerate }: Props) {
   const [draft, setDraft] = useState<Scene | null>(null);
   const [picking, setPicking] = useState<AssetType | null>(null);
   const [saving, setSaving] = useState(false);
@@ -83,7 +88,13 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
     setSaving(true);
     setErr(null);
     try {
-      await onSave(draft);
+      const valid = Object.fromEntries(
+        draft.character_ids.map((cid) => {
+          const ex = draft.character_expressions?.[cid] ?? null;
+          return [cid, ex && expressions.some((x) => x.id === ex && x.character_id === cid) ? ex : null];
+        }),
+      );
+      await onSave({ ...draft, character_expressions: valid });
       setDraft(null);
     } catch (e) {
       console.error("[scene save]", e);
@@ -168,6 +179,21 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
                                 {a.name}
                                 <span className="block font-mono text-[9px] text-muted-ink">{a.code}</span>
                               </span>
+                              {g.type === "character" && (
+                                <select
+                                  aria-label={`Biểu cảm ${a.name}`}
+                                  value={draft.character_expressions?.[a.id] ?? ""}
+                                  onChange={(e) =>
+                                    setDraft({ ...draft, character_expressions: { ...draft.character_expressions, [a.id]: e.target.value || null } })
+                                  }
+                                  className="ml-1 rounded-md border border-line bg-background px-1 py-0.5 text-[10px]"
+                                >
+                                  <option value="">🎭 Biểu cảm…</option>
+                                  {expressions.filter((x) => x.character_id === a.id).map((x) => (
+                                    <option key={x.id} value={x.id}>{x.name}</option>
+                                  ))}
+                                </select>
+                              )}
                               <button
                                 title="Xóa khỏi cảnh"
                                 onClick={() => setDraft(withIds(draft, g.type, idsOf(draft, g.type).filter((x) => x !== a.id)))}
@@ -252,6 +278,11 @@ export function SceneCard({ scene, index, delay, assets = [], onSave, onDuplicat
                       <>
                         {masterUrl(first) && <img src={masterUrl(first)!} alt="" className="size-5 rounded object-cover" />}
                         <span className="truncate font-medium">{first.name}</span>
+                        {g.type === "character" && scene.character_expressions?.[first.id] && (
+                          <span className="text-muted-ink">
+                            (🎭 {expressions.find((x) => x.id === scene.character_expressions[first.id])?.name ?? "—"})
+                          </span>
+                        )}
                         {items.length > 1 && <span className="text-muted-ink">+ {items.length - 1}</span>}
                       </>
                     ) : (

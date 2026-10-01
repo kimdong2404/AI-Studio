@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CharacterSheet } from "./CharacterSheet";
+import { fetchSheetSummaries } from "@/lib/characterSheet";
 import { createPortal } from "react-dom";
 import {
   ASSET_TYPES,
@@ -81,6 +83,12 @@ export function AssetLibrary({
   const [q, setQ] = useState("");
   const [by, setBy] = useState<"all" | "name" | "code">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
+  const [sheetFor, setSheetFor] = useState<Asset | null>(null);
+  const [summ, setSumm] = useState<Record<string, { sheet: boolean; expressions: number }>>({});
+  const loadSumm = () => {
+    if (type === "character") void fetchSheetSummaries().then(setSumm).catch(() => {});
+  };
+  useEffect(loadSumm, [type]);
   const initialIds = useMemo(() => new Set(assets.map((a) => a.id)), [assets]);
   const list = useMemo(
     () => filterAssets(assets.filter((a) => a.type === type), q, by),
@@ -154,6 +162,19 @@ export function AssetLibrary({
                   <p className="mt-2 line-clamp-2 text-xs text-muted-ink">{a.description}</p>
                   <p className="mt-2 text-[11px] text-muted-ink">📷 {a.images.length} ảnh tham chiếu</p>
                   {a.masterImageId && <p className="text-[11px] font-medium text-accent">⭐ Có Master Image</p>}
+                  {type === "character" && (
+                    <p className="mt-1 text-[11px] text-muted-ink">
+                      📋 Character Sheet: {summ[a.id]?.sheet ? "Đã thiết lập" : "Chưa thiết lập"} · 🎭 Biểu cảm: {summ[a.id]?.expressions ?? 0}
+                    </p>
+                  )}
+                  {type === "character" && initialIds.has(a.id) && (
+                    <button
+                      onClick={() => setSheetFor(a)}
+                      className="mt-3 w-full rounded-xl bg-accent-soft py-2 text-xs font-semibold text-accent hover:bg-accent/20"
+                    >
+                      📋 Character Sheet
+                    </button>
+                  )}
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => setEditing(a)}
@@ -186,6 +207,14 @@ export function AssetLibrary({
           remote={!!remote}
           onCancel={() => setEditing(null)}
           onSave={save}
+          onOpenSheet={editing.type === "character" && initialIds.has(editing.id) ? () => setSheetFor(editing) : undefined}
+        />
+      )}
+      {sheetFor && (
+        <CharacterSheet
+          character={assets.find((x) => x.id === sheetFor.id) ?? sheetFor}
+          onClose={() => setSheetFor(null)}
+          onChanged={loadSumm}
         />
       )}
     </div>
@@ -198,7 +227,9 @@ function AssetForm({
   remote,
   onCancel,
   onSave,
+  onOpenSheet,
 }: {
+  onOpenSheet?: (() => void) | undefined;
   initial: Asset;
   isNew: boolean;
   remote: boolean;
@@ -247,6 +278,14 @@ function AssetForm({
         <h3 className="mb-4 font-display text-xl tracking-tight">
           {isNew ? meta.add.replace("+ ", "") : `Chỉnh sửa: ${initial.name}`}
         </h3>
+        {onOpenSheet && (
+          <button
+            onClick={onOpenSheet}
+            className="mb-4 w-full rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-left text-sm font-semibold text-accent"
+          >
+            📋 Character Sheet — mở hồ sơ nhận diện, biểu cảm, Identity Lock →
+          </button>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={a.type === "character" ? "Tên nhân vật *" : a.type === "location" ? "Tên bối cảnh *" : a.type === "ingredient" ? "Tên nguyên liệu *" : "Tên đạo cụ *"}>
