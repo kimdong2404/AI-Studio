@@ -297,20 +297,31 @@ export function buildPrompt(c: PromptCtx): string {
 
 export type SavedPrompt = { auto_prompt: string; edited_prompt: string };
 
+/** Latest version decides what is shown; versions are append-only (never overwritten). */
 export async function fetchSavedPrompt(sceneId: string): Promise<SavedPrompt | null> {
-  const { data, error } = await db.from("scene_prompts").select("auto_prompt, edited_prompt").eq("scene_id", sceneId).maybeSingle();
+  const { data, error } = await db
+    .from("prompt_versions")
+    .select("source_type, content, auto_snapshot")
+    .eq("scene_id", sceneId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (error) throw error;
-  return data;
+  if (!data || data.source_type !== "user_edited") return null;
+  return { auto_prompt: data.auto_snapshot, edited_prompt: data.content };
 }
 
 export async function saveEditedPrompt(sceneId: string, auto: string, edited: string) {
   const { error } = await db
-    .from("scene_prompts")
-    .upsert({ scene_id: sceneId, auto_prompt: auto, edited_prompt: edited, updated_at: new Date().toISOString() }, { onConflict: "scene_id" });
+    .from("prompt_versions")
+    .insert({ scene_id: sceneId, source_type: "user_edited", content: edited, auto_snapshot: auto });
   if (error) throw error;
 }
 
+/** Switch back to auto without deleting saved user versions. */
 export async function clearEditedPrompt(sceneId: string) {
-  const { error } = await db.from("scene_prompts").delete().eq("scene_id", sceneId);
+  const { error } = await db
+    .from("prompt_versions")
+    .insert({ scene_id: sceneId, source_type: "auto_selected", content: "", auto_snapshot: "" });
   if (error) throw error;
 }
