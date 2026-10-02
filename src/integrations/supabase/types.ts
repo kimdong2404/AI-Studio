@@ -951,6 +951,145 @@ export type Database = {
           },
         ]
       }
+      video_generations: {
+        Row: {
+          aspect_ratio: string
+          created_at: string
+          duration: string
+          error_message: string
+          first_frame_url: string
+          frame_rate: string
+          generation_mode: string
+          id: string
+          last_frame_url: string
+          model_id: string | null
+          prompt_text: string
+          prompt_version_id: string | null
+          provider_id: string | null
+          quality: string
+          resolution: string
+          scene_id: string
+          source_image_id: string | null
+          status: string
+          thumbnail_url: string
+          updated_at: string
+          video_url: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          created_at?: string
+          duration?: string
+          error_message?: string
+          first_frame_url?: string
+          frame_rate?: string
+          generation_mode?: string
+          id?: string
+          last_frame_url?: string
+          model_id?: string | null
+          prompt_text?: string
+          prompt_version_id?: string | null
+          provider_id?: string | null
+          quality?: string
+          resolution?: string
+          scene_id: string
+          source_image_id?: string | null
+          status?: string
+          thumbnail_url?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Update: {
+          aspect_ratio?: string
+          created_at?: string
+          duration?: string
+          error_message?: string
+          first_frame_url?: string
+          frame_rate?: string
+          generation_mode?: string
+          id?: string
+          last_frame_url?: string
+          model_id?: string | null
+          prompt_text?: string
+          prompt_version_id?: string | null
+          provider_id?: string | null
+          quality?: string
+          resolution?: string
+          scene_id?: string
+          source_image_id?: string | null
+          status?: string
+          thumbnail_url?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_generations_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "ai_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_generations_prompt_version_id_fkey"
+            columns: ["prompt_version_id"]
+            isOneToOne: false
+            referencedRelation: "video_prompt_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_generations_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_generations_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_prompt_versions: {
+        Row: {
+          created_at: string
+          id: string
+          prompt_text: string
+          scene_id: string
+          source_type: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prompt_text?: string
+          scene_id: string
+          source_type: string
+          updated_at?: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prompt_text?: string
+          scene_id?: string
+          source_type?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_prompt_versions_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
