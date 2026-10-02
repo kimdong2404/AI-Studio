@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Asset } from "@/lib/assets";
 import type { Scene } from "@/lib/storyboard";
 import {
@@ -33,13 +33,18 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
     if (!sceneId && scenes[0]) setSceneId(scenes[0].id);
   }, [scenes, sceneId]);
 
+  // assets is a new array every parent render; read it via ref so typing isn't wiped by rebuilds.
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
+  const assetsKey = assets.map((a) => `${a.id}:${a.masterImageId}`).join(",");
+
   const build = useCallback(async () => {
     const i = scenes.findIndex((s) => s.id === sceneId);
     const scene = scenes[i];
     if (!scene) return;
     setBusy(true);
     try {
-      const c = await loadContext(scene, i, assets);
+      const c = await loadContext(scene, i, assetsRef.current);
       const p = buildPrompt(c);
       const sp = await fetchSavedPrompt(scene.id);
       setCtx(c);
@@ -53,7 +58,8 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [scenes, sceneId, assets]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes, sceneId, assetsKey]);
 
   useEffect(() => {
     void build();
@@ -193,12 +199,12 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
           />
           <div className="mt-3 flex flex-wrap gap-2">
             <button
-              disabled={!dirty || busy}
+              disabled={!dirty}
               onClick={async () => {
                 try {
                   await saveEditedPrompt(sceneId, auto, text);
                   setSaved({ auto_prompt: auto, edited_prompt: text });
-                  setMsg("Đã lưu prompt chỉnh sửa.");
+                  setMsg("Đã lưu bản chỉnh sửa");
                 } catch (e) {
                   setMsg(`Không lưu được. ${e instanceof Error ? e.message : ""}`);
                 }
@@ -210,7 +216,12 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
             <button
               disabled={!edited && !dirty}
               onClick={async () => {
-                if (edited) await clearEditedPrompt(sceneId);
+                try {
+                  if (edited) await clearEditedPrompt(sceneId);
+                } catch (e) {
+                  setMsg(`Không lưu được. ${e instanceof Error ? e.message : ""}`);
+                  return;
+                }
                 setSaved(null);
                 setText(auto);
                 setMsg("Đã khôi phục prompt tự động.");

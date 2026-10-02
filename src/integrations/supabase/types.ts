@@ -461,6 +461,41 @@ export type Database = {
         }
         Relationships: []
       }
+      prompt_versions: {
+        Row: {
+          auto_snapshot: string
+          content: string
+          created_at: string
+          id: string
+          scene_id: string
+          source_type: string
+        }
+        Insert: {
+          auto_snapshot?: string
+          content?: string
+          created_at?: string
+          id?: string
+          scene_id: string
+          source_type?: string
+        }
+        Update: {
+          auto_snapshot?: string
+          content?: string
+          created_at?: string
+          id?: string
+          scene_id?: string
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_versions_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prop_images: {
         Row: {
           created_at: string
