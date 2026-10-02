@@ -37,7 +37,7 @@ export const DEFAULT_VIDEO_SETTINGS: VideoSettings = { mode: "economy", aspect_r
 /** Per-scene overrides set on the video page; never written back to the scene. */
 export type VideoShot = { camera: string; camera_movement: string; duration: string; prev_scene_id: string; next_scene_id: string };
 
-export function buildVideoPrompt(c: PromptCtx, shot: VideoShot, neighbours: { prev?: string; next?: string }): string {
+export function buildVideoPrompt(c: PromptCtx, shot: VideoShot, neighbours: { prev?: string | undefined; next?: string | undefined }): string {
   const s = c.scene;
   const L = c.location;
   const P: string[] = [];
