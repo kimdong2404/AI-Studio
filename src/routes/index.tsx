@@ -4,6 +4,7 @@ import { SceneCard } from "@/components/SceneCard";
 import { AssetLibrary } from "@/components/AssetLibrary";
 import { PromptBuilder } from "@/components/PromptBuilder";
 import { ImageGeneration } from "@/components/ImageGeneration";
+import { VideoGeneration } from "@/components/VideoGeneration";
 import { deleteProp, saveProp, useProps } from "@/lib/props";
 import { fetchAllExpressionsLite, type ExpressionLite } from "@/lib/characterSheet";
 import { fetchScenes, replaceScenes, saveOrder, saveScene } from "@/lib/scenes";
@@ -46,6 +47,7 @@ const SECTIONS = [
   { id: "storyboard", label: "Storyboard", icon: "▦" },
   { id: "prompt", label: "Prompt Builder", icon: "✨" },
   { id: "image", label: "Tạo ảnh AI", icon: "🎨" },
+  { id: "video", label: "Tạo Video AI", icon: "🎬" },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -282,6 +284,8 @@ function StudioPage() {
               )}
             </section>
           </div>
+        ) : section === "video" ? (
+          <VideoGeneration scenes={scenes} assets={assets} onGoToImage={() => setSection("image")} />
         ) : section === "image" ? (
           <ImageGeneration scenes={scenes} assets={assets} />
         ) : section === "prompt" ? (

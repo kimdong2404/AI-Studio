@@ -16,13 +16,13 @@ export type PromptCtx = {
   props: Asset[];
 };
 
-const v = (s?: string | null) => (s ?? "").trim();
-const has = (s?: string | null) => {
+export const v = (s?: string | null) => (s ?? "").trim();
+export const has = (s?: string | null) => {
   const t = v(s);
   return t !== "" && t !== "—" && t !== "-";
 };
 const line = (label: string, s?: string | null) => (has(s) ? `${label}: ${v(s)}` : "");
-const block = (title: string, lines: Array<string | false | null | undefined>) => {
+export const block = (title: string, lines: Array<string | false | null | undefined>) => {
   const body = lines.filter((l): l is string => !!l && l.trim() !== "");
   return body.length ? `[${title}]\n${body.join("\n")}` : "";
 };
@@ -56,15 +56,15 @@ const SPECIES: Array<[RegExp, string]> = [
   [/mèo|cat/i, "cat"], [/chó|dog/i, "dog"], [/thỏ|rabbit/i, "rabbit"], [/gấu|bear/i, "bear"],
   [/chim|bird/i, "bird"], [/cáo|fox/i, "fox"], [/người|human/i, "person"],
 ];
-const sentence = (s: string) => {
+export const sentence = (s: string) => {
   const t = v(s);
   if (!t) return "";
   const c = t.charAt(0).toUpperCase() + t.slice(1);
   return /[.!?…]$/.test(c) ? c : `${c}.`;
 };
-const para = (xs: Array<string | false | null | undefined>) => xs.filter((x): x is string => !!x && x.trim() !== "").join(" ");
+export const para = (xs: Array<string | false | null | undefined>) => xs.filter((x): x is string => !!x && x.trim() !== "").join(" ");
 
-function charSection(c: CharCtx, n: number, scene: Scene): string {
+export function charSection(c: CharCtx, n: number, scene: Scene): string {
   const { asset: a, sheet: sh, expression: e } = c;
   const name = a.name;
   const g = v(a.details["gender"]).toLowerCase();
