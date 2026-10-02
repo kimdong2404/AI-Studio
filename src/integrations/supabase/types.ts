@@ -464,27 +464,33 @@ export type Database = {
       prompt_versions: {
         Row: {
           auto_snapshot: string
-          content: string
           created_at: string
           id: string
+          prompt_text: string
           scene_id: string
           source_type: string
+          updated_at: string
+          version_number: number
         }
         Insert: {
           auto_snapshot?: string
-          content?: string
           created_at?: string
           id?: string
+          prompt_text?: string
           scene_id: string
           source_type?: string
+          updated_at?: string
+          version_number?: number
         }
         Update: {
           auto_snapshot?: string
-          content?: string
           created_at?: string
           id?: string
+          prompt_text?: string
           scene_id?: string
           source_type?: string
+          updated_at?: string
+          version_number?: number
         }
         Relationships: [
           {

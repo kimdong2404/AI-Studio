@@ -33,25 +33,60 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
     if (!sceneId && scenes[0]) setSceneId(scenes[0].id);
   }, [scenes, sceneId]);
 
-  // assets is a new array every parent render; read it via ref so typing isn't wiped by rebuilds.
+  // Scene/asset data are read via refs so re-renders never trigger a rebuild.
+  const scenesRef = useRef(scenes);
+  scenesRef.current = scenes;
   const assetsRef = useRef(assets);
   assetsRef.current = assets;
-  const assetsKey = assets.map((a) => `${a.id}:${a.masterImageId}`).join(",");
+  const dataKey = assets.map((a) => `${a.id}:${a.masterImageId}`).join(",") + "|" + scenes.length;
 
-  const build = useCallback(async () => {
-    const i = scenes.findIndex((s) => s.id === sceneId);
-    const scene = scenes[i];
+  const draftKey = (id: string) => `prompt_builder_draft_${id}`;
+  const readDraft = (id: string) => {
+    try { return localStorage.getItem(draftKey(id)); } catch { return null; }
+  };
+  const writeDraft = (id: string, v: string | null) => {
+    try { v === null ? localStorage.removeItem(draftKey(id)) : localStorage.setItem(draftKey(id), v); } catch { /* ignore */ }
+  };
+
+  /** which scene the textarea has been initialized for; text is only (re)set on init or explicit user actions */
+  const initFor = useRef<string | null>(null);
+  const textRef = useRef(text);
+  textRef.current = text;
+  const autoRef = useRef(auto);
+  autoRef.current = auto;
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
+
+  /** Recompute auto prompt. Only touches currentPrompt on first open of a scene or when forced. */
+  const build = useCallback(async (opts: { forceAuto?: boolean } = {}) => {
+    const list = scenesRef.current;
+    const i = list.findIndex((s) => s.id === sceneId);
+    const scene = list[i];
     if (!scene) return;
     setBusy(true);
     try {
       const c = await loadContext(scene, i, assetsRef.current);
       const p = buildPrompt(c);
-      const sp = await fetchSavedPrompt(scene.id);
+      const prevAuto = autoRef.current;
       setCtx(c);
       setAuto(p);
-      setSaved(sp);
-      setText(sp?.edited_prompt || p);
-      setMsg(null);
+      if (opts.forceAuto) {
+        if (savedRef.current) await clearEditedPrompt(scene.id, p);
+        setSaved(null);
+        writeDraft(scene.id, null);
+        setText(p);
+        initFor.current = scene.id;
+      } else if (initFor.current !== scene.id) {
+        const sp = await fetchSavedPrompt(scene.id);
+        setSaved(sp);
+        const draft = readDraft(scene.id);
+        setText(draft ?? sp?.edited_prompt ?? p);
+        initFor.current = scene.id;
+        setMsg(draft !== null ? "Đã khôi phục bản nháp chưa lưu." : null);
+      } else if (!savedRef.current && textRef.current === prevAuto) {
+        // untouched auto prompt simply follows fresh data (no user content involved)
+        setText(p);
+      }
     } catch (e) {
       console.error("[prompt-builder]", e);
       setMsg(`Không tải được dữ liệu. ${e instanceof Error ? e.message : ""}`);
@@ -59,15 +94,30 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
       setBusy(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenes, sceneId, assetsKey]);
+  }, [sceneId]);
 
   useEffect(() => {
     void build();
-  }, [build]);
+  }, [build, dataKey]);
+
+  const forceAutoNext = useRef(false);
+  useEffect(() => {
+    if (forceAutoNext.current) {
+      forceAutoNext.current = false;
+      void build({ forceAuto: true });
+    }
+  }, [scenes, build]);
 
   const edited = !!saved?.edited_prompt;
   const outdated = edited && saved!.auto_prompt !== auto;
-  const dirty = text !== (saved?.edited_prompt || auto);
+  const baseline = saved?.edited_prompt ?? auto;
+  const dirty = initFor.current === sceneId && text !== baseline;
+  const status = dirty ? "User Edited — Unsaved" : edited ? "User Edited" : "Auto Generated";
+
+  const onType = (v: string) => {
+    setText(v);
+    if (sceneId) writeDraft(sceneId, v === baseline ? null : v);
+  };
 
   const refs: Ref[] = [];
   if (ctx) {
@@ -161,7 +211,7 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="font-display text-lg tracking-tight">Generated Prompt</h2>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${edited || dirty ? "bg-ink text-background" : "bg-accent-soft text-accent"}`}>
-              {edited || dirty ? "User Edited" : "Auto Generated"}
+              {status}
             </span>
             <div className="ml-auto flex flex-wrap gap-2">
               <button
@@ -175,9 +225,12 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
               </button>
               <button
                 onClick={async () => {
+                  if (dirty && !window.confirm("Bạn có thay đổi chưa lưu. Refresh Prompt sẽ tạo lại prompt từ Scene và thay thế nội dung hiện tại. Bạn có muốn tiếp tục?")) return;
                   setBusy(true);
+                  forceAutoNext.current = true;
                   await refreshAll();
                   setBusy(false);
+                  setMsg("Đã tạo lại prompt từ dữ liệu mới nhất.");
                 }}
                 disabled={busy}
                 className="rounded-full border border-line px-4 py-2 text-sm font-medium hover:bg-background disabled:opacity-60"
@@ -194,7 +247,7 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
           {msg && <p className="mb-3 text-sm text-muted-ink">{msg}</p>}
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => onType(e.target.value)}
             className="h-[520px] w-full resize-y rounded-2xl border border-line bg-background p-4 font-mono text-xs leading-relaxed focus:border-accent focus:outline-none"
           />
           <div className="mt-3 flex flex-wrap gap-2">
@@ -204,7 +257,8 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
                 try {
                   await saveEditedPrompt(sceneId, auto, text);
                   setSaved({ auto_prompt: auto, edited_prompt: text });
-                  setMsg("Đã lưu bản chỉnh sửa");
+                  writeDraft(sceneId, null);
+                  setMsg("Đã lưu bản chỉnh sửa.");
                 } catch (e) {
                   setMsg(`Không lưu được. ${e instanceof Error ? e.message : ""}`);
                 }
@@ -216,15 +270,9 @@ export function PromptBuilder({ scenes, assets, refreshAll }: Props) {
             <button
               disabled={!edited && !dirty}
               onClick={async () => {
-                try {
-                  if (edited) await clearEditedPrompt(sceneId);
-                } catch (e) {
-                  setMsg(`Không lưu được. ${e instanceof Error ? e.message : ""}`);
-                  return;
-                }
-                setSaved(null);
-                setText(auto);
-                setMsg("Đã khôi phục prompt tự động.");
+                if (dirty && !window.confirm("Bạn có thay đổi chưa lưu. Dùng prompt tự động sẽ thay thế nội dung hiện tại. Bạn có chắc chắn muốn tiếp tục?")) return;
+                await build({ forceAuto: true });
+                setMsg("Đã chuyển về prompt tự động.");
               }}
               className="rounded-full border border-line px-4 py-2 text-sm font-medium disabled:opacity-40"
             >
