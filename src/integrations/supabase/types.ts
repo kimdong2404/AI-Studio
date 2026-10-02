@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_models: {
+        Row: {
+          code: string
+          created_at: string
+          enabled: boolean
+          generation_mode: string
+          id: string
+          name: string
+          provider_id: string
+          supports_image_generation: boolean
+          supports_reference_images: boolean
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          enabled?: boolean
+          generation_mode?: string
+          id?: string
+          name: string
+          provider_id: string
+          supports_image_generation?: boolean
+          supports_reference_images?: boolean
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          enabled?: boolean
+          generation_mode?: string
+          id?: string
+          name?: string
+          provider_id?: string
+          supports_image_generation?: boolean
+          supports_reference_images?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_models_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_providers: {
+        Row: {
+          code: string
+          created_at: string
+          enabled: boolean
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       character_expression_images: {
         Row: {
           created_at: string
@@ -306,6 +380,89 @@ export type Database = {
           recognition_features?: string
         }
         Relationships: []
+      }
+      image_generations: {
+        Row: {
+          aspect_ratio: string
+          created_at: string
+          error_message: string
+          generation_mode: string
+          id: string
+          image_count: number
+          model_id: string | null
+          prompt_text: string
+          prompt_version_id: string | null
+          provider_id: string | null
+          quality: string
+          resolution: string
+          scene_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          created_at?: string
+          error_message?: string
+          generation_mode?: string
+          id?: string
+          image_count?: number
+          model_id?: string | null
+          prompt_text?: string
+          prompt_version_id?: string | null
+          provider_id?: string | null
+          quality?: string
+          resolution?: string
+          scene_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          aspect_ratio?: string
+          created_at?: string
+          error_message?: string
+          generation_mode?: string
+          id?: string
+          image_count?: number
+          model_id?: string | null
+          prompt_text?: string
+          prompt_version_id?: string | null
+          provider_id?: string | null
+          quality?: string
+          resolution?: string
+          scene_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_generations_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "ai_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_generations_prompt_version_id_fkey"
+            columns: ["prompt_version_id"]
+            isOneToOne: false
+            referencedRelation: "prompt_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_generations_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_generations_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "scenes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ingredient_images: {
         Row: {
