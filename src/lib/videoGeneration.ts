@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { block, charSection, has, master, para, sentence, v, type PromptCtx } from "./promptBuilder";
+import { block, charSection, has, para, sentence, v, type PromptCtx } from "./promptBuilder";
 import type { AiModel, AiProvider, GenerationMode, ReferenceImage } from "./imageGeneration";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,7 +124,6 @@ export function buildVideoPrompt(c: PromptCtx, shot: VideoShot, neighbours: { pr
   return P.filter(Boolean).join("\n\n");
 }
 
-export const hasMaster = master;
 
 /* ---------- video prompt versions (append-only) ---------- */
 export type VideoPromptVersion = { id: string; source_type: "auto_generated" | "user_edited"; prompt_text: string; version_number: number };
