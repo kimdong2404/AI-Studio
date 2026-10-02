@@ -297,31 +297,39 @@ export function buildPrompt(c: PromptCtx): string {
 
 export type SavedPrompt = { auto_prompt: string; edited_prompt: string };
 
+async function nextVersion(sceneId: string): Promise<number> {
+  const { data } = await db.from("prompt_versions").select("version_number").eq("scene_id", sceneId).order("version_number", { ascending: false }).limit(1).maybeSingle();
+  return (data?.version_number ?? 0) + 1;
+}
+
 /** Latest version decides what is shown; versions are append-only (never overwritten). */
 export async function fetchSavedPrompt(sceneId: string): Promise<SavedPrompt | null> {
   const { data, error } = await db
     .from("prompt_versions")
-    .select("source_type, content, auto_snapshot")
+    .select("source_type, prompt_text, auto_snapshot")
     .eq("scene_id", sceneId)
+    .order("version_number", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
   if (!data || data.source_type !== "user_edited") return null;
-  return { auto_prompt: data.auto_snapshot, edited_prompt: data.content };
+  return { auto_prompt: data.auto_snapshot, edited_prompt: data.prompt_text };
 }
 
 export async function saveEditedPrompt(sceneId: string, auto: string, edited: string) {
+  const version_number = await nextVersion(sceneId);
   const { error } = await db
     .from("prompt_versions")
-    .insert({ scene_id: sceneId, source_type: "user_edited", content: edited, auto_snapshot: auto });
+    .insert({ scene_id: sceneId, source_type: "user_edited", prompt_text: edited, auto_snapshot: auto, version_number });
   if (error) throw error;
 }
 
 /** Switch back to auto without deleting saved user versions. */
-export async function clearEditedPrompt(sceneId: string) {
+export async function clearEditedPrompt(sceneId: string, auto: string) {
+  const version_number = await nextVersion(sceneId);
   const { error } = await db
     .from("prompt_versions")
-    .insert({ scene_id: sceneId, source_type: "auto_selected", content: "", auto_snapshot: "" });
+    .insert({ scene_id: sceneId, source_type: "auto_generated", prompt_text: auto, auto_snapshot: auto, version_number });
   if (error) throw error;
 }
