@@ -12,3 +12,4 @@
 - No user accounts yet: character tables/bucket are open to anonymous users by design (spec says no auth in V2).
 - Scenes persist in Lovable Cloud (scenes + scene_characters/scene_ingredients/scene_props link tables, scenes.location_id); scenes store only asset IDs — why: asset edits/Master changes must flow into storyboard. All 4 asset libraries use createRemoteAssets.
 - Character Sheet: character_sheets (1 per character), character_expressions + character_expression_images (bucket prefix expressions/); scene_characters.expression_id stores the scene's chosen expression per character — why: expressions belong to a character, scenes reference by ID only.
+- Prompt Builder builds prompts on the fly from scene + library data by ID; only user-edited prompts are stored (scene_prompts, with the auto snapshot to detect outdated edits) — why: never copy asset data into scenes.

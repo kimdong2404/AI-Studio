@@ -605,6 +605,41 @@ export type Database = {
           },
         ]
       }
+      scene_prompts: {
+        Row: {
+          auto_prompt: string
+          created_at: string
+          edited_prompt: string
+          id: string
+          scene_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_prompt?: string
+          created_at?: string
+          edited_prompt?: string
+          id?: string
+          scene_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_prompt?: string
+          created_at?: string
+          edited_prompt?: string
+          id?: string
+          scene_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_prompts_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: true
+            referencedRelation: "scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scene_props: {
         Row: {
           created_at: string
