@@ -98,7 +98,7 @@ function charSection(c: CharCtx, n: number, scene: Scene): string {
     ["Overall color", "overall_color"], ["Fur / hair color", "hair_color"], ["Pattern", "pattern"], ["Eye color", "eye_color"],
     ["Face shape", "face_shape"], ["Ears", "ears"], ["Nose", "nose"], ["Mouth", "mouth"], ["Body", "body_features"], ["Special marks", "special_marks"],
   ]
-    .filter(([, k]) => has(sh?.[k!]))
+    .filter(([, k]) => has(sh?.[k!]) && !isNone(sh?.[k!]))
     .map(([l, k]) => `${l}: ${v(sh![k!])}`);
   const appearance = para([
     looks.length ? sentence(looks.join("; ")) : "",
@@ -145,11 +145,11 @@ function charSection(c: CharCtx, n: number, scene: Scene): string {
 
   const extra = a.images.filter((i) => i.id !== a.masterImageId).length;
   const refs = [
-    master(a) ? "1. Character master image (primary reference)." : "",
-    e && master(e) ? "2. Expression master image." : "",
-    extra ? `3. ${extra} additional character reference image${extra > 1 ? "s" : ""}.` : "",
-    "4. Character sheet text above.",
-  ].filter(Boolean);
+    master(a) ? "Character master image (primary reference)." : "",
+    e && master(e) ? "Expression master image." : "",
+    extra ? `${extra} additional character reference image${extra > 1 ? "s" : ""}.` : "",
+    "Character sheet text above.",
+  ].filter(Boolean).map((t, i) => `${i + 1}. ${t}`);
 
   return [
     `[CHARACTER ${n} — ${name.toUpperCase()}]${has(a.code) ? ` (${a.code})` : ""}`,
