@@ -62,7 +62,7 @@ export function buildVideoPrompt(c: PromptCtx, shot: VideoShot, neighbours: { pr
     block(
       "EXPRESSION",
       c.characters.map(({ asset: a, expression: e }) =>
-        e ? `${a.name}: ${e.name}${has(e.description) ? ` — ${sentence(e.description)}` : ""}` : `${a.name}: no specific expression selected.`,
+        e ? `${a.name}: ${e.name}${has(e.fields["description"]) ? ` — ${sentence(e.fields["description"]!)}` : ""}` : `${a.name}: no specific expression selected.`,
       ),
     ),
   );
