@@ -4,6 +4,7 @@ import { masterUrl, type Asset, type AssetType } from "@/lib/assets";
 import { AssetPicker } from "./AssetPicker";
 import type { ExpressionLite } from "@/lib/characterSheet";
 import { syncAssetText } from "@/lib/gemini";
+import { speakVietnamese, stopSpeaking, ttsSupported } from "@/lib/sceneMedia";
 
 type Props = {
   scene: Scene;
@@ -14,6 +15,8 @@ type Props = {
   onSave: (scene: Scene) => Promise<void>;
   onDuplicate: () => void;
   onRegenerate: () => void;
+  media?: { image?: string | null; loading?: boolean; status?: string | undefined; error?: string | undefined } | undefined;
+  onGenerateImage?: () => void;
 };
 
 type TextKey = "character" | "location" | "props" | "camera" | "duration";
@@ -76,7 +79,18 @@ function withIds(s: Scene, t: AssetType, ids: string[]): Scene {
   return { ...s, location_id: ids[0] ?? null };
 }
 
-export function SceneCard({ scene, index, delay, assets = [], expressions = [], onSave, onDuplicate, onRegenerate }: Props) {
+export function SceneCard({ scene, index, delay, assets = [], expressions = [], onSave, onDuplicate, onRegenerate, media, onGenerateImage }: Props) {
+  const [speaking, setSpeaking] = useState(false);
+  const voiceText = [scene.description, scene.dialogue].filter((x) => x?.trim()).join(". ");
+  const toggleVoice = () => {
+    if (speaking) {
+      stopSpeaking();
+      setSpeaking(false);
+      return;
+    }
+    setSpeaking(true);
+    speakVietnamese(voiceText, () => setSpeaking(false));
+  };
   const [draft, setDraft] = useState<Scene | null>(null);
   const [picking, setPicking] = useState<AssetType | null>(null);
   const [saving, setSaving] = useState(false);
@@ -108,14 +122,43 @@ export function SceneCard({ scene, index, delay, assets = [], expressions = [], 
   return (
     <article className="rise overflow-hidden rounded-3xl border border-line bg-surface" style={{ animationDelay: `${delay}ms` }}>
       <div className="relative">
-        <div className="grid aspect-[16/9] w-full place-items-center bg-background outline-1 -outline-offset-1 outline-ink/5">
-          <div className="flex flex-col items-center gap-2 text-muted-ink/60">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-8">
-              <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1-1.6A1.5 1.5 0 0 1 9.5 3.7h5a1.5 1.5 0 0 1 1.3.7l1 1.6h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-8Z" />
-              <circle cx="12" cy="12.5" r="3.3" />
-            </svg>
-            <span className="text-[10px] font-medium uppercase tracking-[0.15em]">Hình ảnh</span>
-          </div>
+        <div className="relative grid aspect-[16/9] w-full place-items-center overflow-hidden bg-background outline-1 -outline-offset-1 outline-ink/5">
+          {media?.image ? (
+            <img src={media.image} alt={scene.title} className="absolute inset-0 size-full object-cover" />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-muted-ink/60">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="size-8">
+                <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1-1.6A1.5 1.5 0 0 1 9.5 3.7h5a1.5 1.5 0 0 1 1.3.7l1 1.6h1.7A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-8Z" />
+                <circle cx="12" cy="12.5" r="3.3" />
+              </svg>
+              <span className="text-[10px] font-medium uppercase tracking-[0.15em]">Hình ảnh</span>
+            </div>
+          )}
+          {media?.loading && (
+            <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 text-xs text-muted-ink backdrop-blur-sm">
+              <span className="size-6 animate-spin rounded-full border-2 border-line border-t-accent" />
+              {media.status ?? "Đang tạo hình ảnh..."}
+            </div>
+          )}
+          {media?.error && !media.loading && (
+            <p className="absolute inset-x-2 bottom-2 rounded-md bg-destructive/90 px-2 py-1 text-[11px] text-destructive-foreground">{media.error}</p>
+          )}
+        </div>
+        <div className="absolute right-3 top-3 flex gap-1.5">
+          {onGenerateImage && (
+            <button
+              onClick={onGenerateImage}
+              disabled={media?.loading}
+              className="rounded-md bg-ink/80 px-2 py-1 text-[11px] font-medium text-background hover:bg-ink disabled:opacity-60"
+            >
+              🖼️ {media?.image ? "Tạo lại ảnh" : "Tạo ảnh"}
+            </button>
+          )}
+          {ttsSupported() && voiceText && (
+            <button onClick={toggleVoice} aria-label="Phát giọng đọc" className="rounded-md bg-ink/80 px-2 py-1 text-[11px] font-medium text-background hover:bg-ink">
+              {speaking ? "⏹ Dừng" : "▶ Giọng đọc"}
+            </button>
+          )}
         </div>
         <span className="absolute left-3 top-3 rounded-md bg-ink px-2 py-1 font-mono text-[11px] text-background">
           Cảnh {String(index + 1).padStart(2, "0")}

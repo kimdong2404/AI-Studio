@@ -10,6 +10,7 @@ import { PromptBuilder } from "@/components/PromptBuilder";
 import { ImageGeneration } from "@/components/ImageGeneration";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { analyzeWithGemini, GEMINI_KEY, getKey, MissingKeyError, rewriteScenePrompt } from "@/lib/gemini";
+import { generateSceneImage, getHfToken, loadSceneImage, MissingHfTokenError, storeSceneImage } from "@/lib/sceneMedia";
 import { VideoGeneration } from "@/components/VideoGeneration";
 import { deleteProp, saveProp, useProps } from "@/lib/props";
 import { fetchAllExpressionsLite, type ExpressionLite } from "@/lib/characterSheet";
@@ -108,6 +109,58 @@ function StudioPage() {
     void run(async () => setScenes(await fetchScenes()));
   }, []);
   const [expressions, setExpressions] = useState<ExpressionLite[]>([]);
+  type Media = { image?: string | null; loading?: boolean; status?: string | undefined; error?: string | undefined };
+  const [media, setMedia] = useState<Record<string, Media>>({});
+  const [rendering, setRendering] = useState(false);
+  const patchMedia = (id: string, m: Media) => setMedia((prev) => ({ ...prev, [id]: { ...prev[id], ...m } }));
+  useEffect(() => {
+    setMedia((prev) => {
+      const next = { ...prev };
+      for (const sc of scenes) if (next[sc.id]?.image === undefined) next[sc.id] = { ...next[sc.id], image: loadSceneImage(sc.id) };
+      return next;
+    });
+  }, [scenes]);
+  const needHfToken = () => {
+    setSettingsNotice("Vui lòng nhập Hugging Face Token để tạo hình ảnh.");
+    setSettingsOpen(true);
+  };
+  /** Returns false if it should stop (missing token). */
+  const genImage = async (sc: Scene): Promise<boolean> => {
+    if (!getHfToken()) {
+      needHfToken();
+      return false;
+    }
+    patchMedia(sc.id, { loading: true, error: undefined, status: "Đang tạo hình ảnh..." });
+    try {
+      const url = await generateSceneImage(sc, assets, (m) => patchMedia(sc.id, { status: m }));
+      storeSceneImage(sc.id, url);
+      patchMedia(sc.id, { image: url, loading: false, status: undefined });
+    } catch (e) {
+      console.error("[hf image]", e);
+      if (e instanceof MissingHfTokenError) {
+        needHfToken();
+        patchMedia(sc.id, { loading: false, status: undefined });
+        return false;
+      }
+      patchMedia(sc.id, { loading: false, status: undefined, error: e instanceof Error ? e.message : String(e) });
+    }
+    return true;
+  };
+  const renderAll = async () => {
+    if (rendering) return;
+    if (!scenes.length) return setActionNotice("Chưa có phân cảnh để render.");
+    if (!getHfToken()) return needHfToken();
+    setRendering(true);
+    try {
+      for (const [i, sc] of scenes.entries()) {
+        setActionNotice(`🎬 Đang render cảnh ${i + 1}/${scenes.length}…`);
+        if (!(await genImage(sc))) break;
+      }
+      setActionNotice("✅ Render xong. Bấm ▶ trên từng cảnh để nghe giọng đọc.");
+    } finally {
+      setRendering(false);
+    }
+  };
   useEffect(() => {
     void fetchAllExpressionsLite().then(setExpressions).catch((e) => console.error("[expressions]", e));
   }, [section]);
@@ -342,8 +395,8 @@ function StudioPage() {
                   >
                     + Thêm cảnh
                   </Button>
-                  <Button className="bg-accent font-semibold text-accent-foreground shadow-sm hover:bg-accent/90" onClick={() => setActionNotice(scenes.length === 0 ? "Chưa có phân cảnh để tạo video." : "Render All chưa được kết nối dịch vụ tạo video. Chưa có video nào được tạo và không phát sinh chi phí.")}>
-                    <span aria-hidden="true">🎬</span> Render All
+                  <Button className="bg-accent font-semibold text-accent-foreground shadow-sm hover:bg-accent/90" disabled={rendering} onClick={() => void renderAll()}>
+                    <span aria-hidden="true">🎬</span> {rendering ? "Đang render…" : "Render All"}
                   </Button>
                   <Button variant="outline" onClick={() => setActionNotice("Chưa có video và âm thanh đã tạo để tải xuống ZIP.")}>
                     <span aria-hidden="true">⬇️</span> Export ZIP
@@ -395,6 +448,8 @@ function StudioPage() {
                       onSave={updateScene}
                       onDuplicate={() => duplicateScene(scene.id)}
                       onRegenerate={() => void regenerateScene(scene.id)}
+                      media={media[scene.id]}
+                      onGenerateImage={() => void genImage(scene)}
                     />
                   ))}
                 </div>
