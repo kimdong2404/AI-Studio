@@ -2,9 +2,9 @@ import { masterUrl, type Asset } from "@/lib/assets";
 import type { Scene } from "@/lib/storyboard";
 import { getKey, HF_KEY } from "@/lib/gemini";
 
-/** Free text-to-image model on Hugging Face Inference (router). */
-export const HF_IMAGE_MODEL = "black-forest-labs/FLUX.1-schnell";
-const HF_URL = `https://router.huggingface.co/hf-inference/models/${HF_IMAGE_MODEL}`;
+/** Free text-to-image models on Hugging Face Inference (router). Tried in order — the first available one wins. */
+export const HF_IMAGE_MODELS = ["stabilityai/stable-diffusion-xl-base-1.0", "black-forest-labs/FLUX.1-schnell"];
+const HF_URL = (model: string) => `https://router.huggingface.co/hf-inference/models/${model}`;
 
 export class MissingHfTokenError extends Error {
   constructor() {
