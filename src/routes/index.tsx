@@ -18,7 +18,6 @@ import { deleteCharacter, saveCharacter, useCharacters } from "@/lib/characters"
 import { deleteLocation, saveLocation, useLocations } from "@/lib/locations";
 import { deleteIngredient, saveIngredient, useIngredients } from "@/lib/ingredients";
 import {
-  analyzeScript,
   emptyScene,
   nextId,
   SAMPLE_SCRIPT,
