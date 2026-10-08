@@ -40,8 +40,8 @@ export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus
   if (!token) throw new MissingHfTokenError();
   const prompt = buildImagePrompt(scene, assets);
   const delays = [2, 4, 6];
-  let lastErr = "";
-  for (const model of HF_IMAGE_MODELS) {
+  const model = getHfModel();
+  {
     for (let attempt = 0; ; attempt++) {
       const res = await fetch(HF_URL(model), {
         method: "POST",
