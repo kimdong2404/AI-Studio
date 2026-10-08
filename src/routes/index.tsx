@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ChevronDown, FolderOpen, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SceneCard } from "@/components/SceneCard";
 import { AssetLibrary } from "@/components/AssetLibrary";
 import { PromptBuilder } from "@/components/PromptBuilder";
@@ -29,6 +33,8 @@ export const Route = createFileRoute("/")({
           "Nhập kịch bản video của bạn và nhận ngay storyboard phân cảnh trực quan: nhân vật, bối cảnh, đạo cụ, góc máy và thời lượng.",
       },
       { property: "og:title", content: "AI Storyboard Studio" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       {
         property: "og:description",
         content: "Nhập kịch bản, nhận storyboard phân cảnh trực quan trong vài giây.",
@@ -61,8 +67,17 @@ const LIB_TYPE = {
   props: "prop",
 } as const;
 
+const VOICES = ["Giọng Nữ truyền cảm", "Giọng Bà lão", "Giọng Nam trầm"];
+const VIDEO_MODELS = ["Luma Lower Priority", "Wan 2.1", "CogVideoX"];
+const RESOURCE_SECTIONS = SECTIONS.filter((item) => item.id in LIB_TYPE);
+
 function StudioPage() {
   const [section, setSection] = useState<SectionId>("script");
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [voiceover, setVoiceover] = useState("");
+  const [videoModel, setVideoModel] = useState("");
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [script, setScript] = useState(SAMPLE_SCRIPT);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -138,31 +153,68 @@ function StudioPage() {
 
   return (
     <div className="min-h-screen bg-background font-body text-ink antialiased">
-      <aside className="fixed bottom-0 left-0 top-0 z-20 flex w-16 flex-col items-center gap-1 border-r border-line bg-surface py-4">
+      <aside className={`fixed bottom-0 left-0 top-0 z-20 flex flex-col items-center gap-1 overflow-y-auto border-r border-line bg-surface py-4 ${sidebarExpanded ? "w-52" : "w-16"}`}>
         <div className="mb-4 grid size-10 place-items-center rounded-2xl bg-ink font-display text-lg text-background">
           S
         </div>
-        <nav className="flex flex-col gap-1">
-          {SECTIONS.map((item) => (
-            <button
+        <nav aria-label="Điều hướng chính" className={`flex w-full flex-col gap-1 ${sidebarExpanded ? "px-3" : "px-2"}`}>
+          {SECTIONS.filter((item) => !(item.id in LIB_TYPE)).map((item) => (
+            <div key={item.id}>
+            <Button
               key={item.id}
+              variant="ghost"
               title={item.label}
+              aria-label={item.label}
+              aria-current={section === item.id ? "page" : undefined}
               onClick={() => setSection(item.id)}
-              className={`grid size-11 place-items-center rounded-2xl text-lg ${
+              className={`h-11 w-full ${sidebarExpanded ? "justify-start" : "px-0"} ${
                 section === item.id
                   ? "bg-accent text-accent-foreground shadow-sm"
                   : "text-muted-ink hover:bg-background"
               }`}
             >
-              {item.icon}
-            </button>
+              <span aria-hidden="true" className="w-5 shrink-0 text-center text-lg">{item.icon}</span>
+              {sidebarExpanded && <span>{item.label}</span>}
+            </Button>
+            {item.id === "script" && (
+              <Collapsible open={resourcesOpen && sidebarExpanded} onOpenChange={setResourcesOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    title="Tài nguyên"
+                    aria-label="Tài nguyên"
+                    onClick={() => {
+                      if (!sidebarExpanded) {
+                        setSidebarExpanded(true);
+                        setResourcesOpen(true);
+                      }
+                    }}
+                    className={`mt-1 h-11 w-full ${sidebarExpanded ? "justify-start" : "px-0"} ${section in LIB_TYPE ? "bg-accent-soft text-accent" : "text-muted-ink hover:bg-background"}`}
+                  >
+                    <FolderOpen aria-hidden="true" />
+                    {sidebarExpanded && <><span>Tài nguyên</span><ChevronDown className={`ml-auto transition-transform motion-reduce:transition-none ${resourcesOpen ? "rotate-180" : ""}`} /></>}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="ml-2 mt-1 border-l border-line pl-2">
+                  {RESOURCE_SECTIONS.map((resource) => (
+                    <Button key={resource.id} variant="ghost" title={resource.label} aria-current={section === resource.id ? "page" : undefined} onClick={() => setSection(resource.id)} className={`mb-1 h-9 w-full justify-start ${section === resource.id ? "bg-accent text-accent-foreground" : "text-muted-ink hover:bg-background"}`}>
+                      <span aria-hidden="true" className="w-4 text-center">{resource.icon}</span>{resource.label}
+                    </Button>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+            </div>
           ))}
         </nav>
       </aside>
 
-      <div className="pl-16">
+      <div className={sidebarExpanded ? "pl-52" : "pl-16"}>
         <header className="sticky top-0 z-10 border-b border-line bg-background/90 backdrop-blur">
           <div className="flex flex-wrap items-center gap-4 px-4 py-4 sm:px-8">
+            <Button variant="ghost" size="icon" title={sidebarExpanded ? "Thu gọn thanh điều hướng" : "Mở thanh điều hướng"} aria-label={sidebarExpanded ? "Thu gọn thanh điều hướng" : "Mở thanh điều hướng"} onClick={() => setSidebarExpanded((expanded) => !expanded)}>
+              {sidebarExpanded ? <PanelLeftClose /> : <PanelLeftOpen />}
+            </Button>
             <div className="flex items-center gap-3">
               <div className="grid size-9 place-items-center rounded-xl bg-ink font-display text-base text-background">
                 S
@@ -199,6 +251,22 @@ function StudioPage() {
                   placeholder="Nhập ý tưởng hoặc kịch bản video của bạn..."
                   className="h-56 w-full resize-none rounded-2xl border border-line bg-background p-4 text-sm leading-relaxed text-ink placeholder:text-muted-ink/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                 />
+                <div className="mt-4 grid gap-3">
+                  <div>
+                    <label htmlFor="script-voiceover" className="mb-1.5 block text-xs font-semibold text-ink">Chọn Giọng đọc (Voiceover)</label>
+                    <Select value={voiceover} onValueChange={setVoiceover}>
+                      <SelectTrigger id="script-voiceover" className="bg-background"><SelectValue placeholder="Chọn giọng đọc" /></SelectTrigger>
+                      <SelectContent>{VOICES.map((voice) => <SelectItem key={voice} value={voice}>{voice}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label htmlFor="script-video-model" className="mb-1.5 block text-xs font-semibold text-ink">Chọn Model Video</label>
+                    <Select value={videoModel} onValueChange={setVideoModel}>
+                      <SelectTrigger id="script-video-model" className="bg-background"><SelectValue placeholder="Chọn model video" /></SelectTrigger>
+                      <SelectContent>{VIDEO_MODELS.map((model) => <SelectItem key={model} value={model}>{model}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <button
                   onClick={analyze}
                   disabled={analyzing}
@@ -225,7 +293,7 @@ function StudioPage() {
                 <h2 className="font-display text-2xl tracking-tight">Storyboard của bạn</h2>
                 <span className="font-mono text-[11px] text-muted-ink">02</span>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                  <button
+                  <Button
                     onClick={() => {
                       const n = emptyScene(scenes.length + 1);
                       setScenes((p) => [...p, n]);
@@ -234,7 +302,13 @@ function StudioPage() {
                     className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-background hover:bg-ink/90"
                   >
                     + Thêm cảnh
-                  </button>
+                  </Button>
+                  <Button className="bg-accent font-semibold text-accent-foreground shadow-sm hover:bg-accent/90" onClick={() => setActionNotice(scenes.length === 0 ? "Chưa có phân cảnh để tạo video." : "Render All chưa được kết nối dịch vụ tạo video. Chưa có video nào được tạo và không phát sinh chi phí.")}>
+                    <span aria-hidden="true">🎬</span> Render All
+                  </Button>
+                  <Button variant="outline" onClick={() => setActionNotice("Chưa có video và âm thanh đã tạo để tải xuống ZIP.")}>
+                    <span aria-hidden="true">⬇️</span> Export ZIP
+                  </Button>
                   <button
                     onClick={analyze}
                     className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium hover:bg-background"
@@ -253,6 +327,7 @@ function StudioPage() {
                 </div>
               </div>
 
+              {actionNotice && <p role="status" className="mb-4 rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted-ink">{actionNotice}</p>}
               {dbError && (
                 <p className="mb-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{dbError}</p>
               )}
