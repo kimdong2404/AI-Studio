@@ -3,6 +3,8 @@ import { nextId, type Scene } from "@/lib/storyboard";
 
 export const GEMINI_KEY = "GEMINI_API_KEY";
 export const HF_KEY = "HF_TOKEN";
+export const HF_MODEL_KEY = "HF_MODEL_ID";
+export const DEFAULT_HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0";
 const MODELS = ["gemini-1.5-flash", "gemini-2.5-flash"]; // gemini-1.5-flash first; 2.5 only if Google reports 1.5 as unavailable (404)
 
 export const getKey = (k: string) => (typeof window === "undefined" ? "" : localStorage.getItem(k) ?? "");

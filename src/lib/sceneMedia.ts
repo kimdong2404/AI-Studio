@@ -1,10 +1,10 @@
 import { masterUrl, type Asset } from "@/lib/assets";
 import type { Scene } from "@/lib/storyboard";
-import { getKey, HF_KEY } from "@/lib/gemini";
+import { getKey, HF_KEY, HF_MODEL_KEY, DEFAULT_HF_MODEL } from "@/lib/gemini";
 
-/** Free text-to-image models on Hugging Face Inference (router). Tried in order — the first available one wins. */
-export const HF_IMAGE_MODELS = ["stabilityai/stable-diffusion-xl-base-1.0", "black-forest-labs/FLUX.1-schnell"];
-const HF_URL = (model: string) => `https://router.huggingface.co/hf-inference/models/${model}`;
+/** Model ID comes from Settings (localStorage) — never hard-coded here. */
+export const getHfModel = () => getKey(HF_MODEL_KEY) || DEFAULT_HF_MODEL;
+const HF_URL = (model: string) => `https://api-inference.huggingface.co/models/${model}`;
 
 export class MissingHfTokenError extends Error {
   constructor() {
