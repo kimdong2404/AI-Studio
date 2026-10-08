@@ -109,7 +109,7 @@ function StudioPage() {
     void run(async () => setScenes(await fetchScenes()));
   }, []);
   const [expressions, setExpressions] = useState<ExpressionLite[]>([]);
-  type Media = { image?: string | null; loading?: boolean; status?: string; error?: string };
+  type Media = { image?: string | null; loading?: boolean; status?: string | undefined; error?: string | undefined };
   const [media, setMedia] = useState<Record<string, Media>>({});
   const [rendering, setRendering] = useState(false);
   const patchMedia = (id: string, m: Media) => setMedia((prev) => ({ ...prev, [id]: { ...prev[id], ...m } }));

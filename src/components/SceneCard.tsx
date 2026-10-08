@@ -15,7 +15,7 @@ type Props = {
   onSave: (scene: Scene) => Promise<void>;
   onDuplicate: () => void;
   onRegenerate: () => void;
-  media?: { image?: string | null; loading?: boolean; status?: string; error?: string };
+  media?: { image?: string | null; loading?: boolean; status?: string | undefined; error?: string | undefined } | undefined;
   onGenerateImage?: () => void;
 };
 
