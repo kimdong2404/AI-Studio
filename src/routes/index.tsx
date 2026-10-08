@@ -82,6 +82,8 @@ function StudioPage() {
   const [script, setScript] = useState(SAMPLE_SCRIPT);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [retryMsg, setRetryMsg] = useState<string | null>(null);
+  const onRetry = (n: number, max: number, w: number) => setRetryMsg(`🔄 Google đang quá tải — Đang thử lại... (lần ${n}/${max}, chờ ${w} giây)`);
   const [dbError, setDbError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
@@ -124,7 +126,7 @@ function StudioPage() {
     setSection("storyboard");
     try {
       const used = new Set(scenes.flatMap((sc) => [...sc.character_ids, ...sc.ingredient_ids, ...sc.prop_ids, ...(sc.location_id ? [sc.location_id] : [])]));
-      const next = await analyzeWithGemini(script, assets, assets.filter((a) => used.has(a.id)));
+      const next = await analyzeWithGemini(script, assets, assets.filter((a) => used.has(a.id)), onRetry);
       setScenes(next);
       await run(() => replaceScenes(next));
     } catch (e) {
@@ -134,6 +136,7 @@ function StudioPage() {
         setSettingsOpen(true);
       } else setAnalyzeError(`Phân tích thất bại: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
+      setRetryMsg(null);
       setAnalyzing(false);
     }
   };
@@ -161,13 +164,16 @@ function StudioPage() {
     const s = scenes.find((x) => x.id === id);
     if (!s) return;
     if (getKey(GEMINI_KEY)) {
+      setAnalyzeError(null);
       try {
-        const upd = { ...s, action: await rewriteScenePrompt(s, assets) };
+        const upd = { ...s, action: await rewriteScenePrompt(s, assets, onRetry) };
         setScenes((prev) => prev.map((x) => (x.id === id ? upd : x)));
         await run(() => saveScene(upd, scenes.indexOf(s)));
       } catch (e) {
         console.error("[gemini rewrite]", e);
         setAnalyzeError(`Không viết lại được prompt: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setRetryMsg(null);
       }
       return;
     }
@@ -361,7 +367,8 @@ function StudioPage() {
               </div>
 
               {actionNotice && <p role="status" className="mb-4 rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted-ink">{actionNotice}</p>}
-              {analyzing && <p role="status" className="mb-4 animate-pulse rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted-ink">⏳ Gemini đang phân tích kịch bản…</p>}
+              {retryMsg && <p role="status" className="mb-4 animate-pulse rounded-md border border-line bg-accent-soft px-4 py-3 text-sm text-accent">{retryMsg}</p>}
+              {analyzing && !retryMsg && <p role="status" className="mb-4 animate-pulse rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted-ink">⏳ Gemini đang phân tích kịch bản…</p>}
               {analyzeError && <p role="alert" className="mb-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{analyzeError}</p>}
               {dbError && (
                 <p className="mb-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{dbError}</p>
