@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { block, charSection, has, para, sentence, v, type PromptCtx } from "./promptBuilder";
-import type { AiModel, AiProvider, GenerationMode, ReferenceImage } from "./imageGeneration";
+import { toImageInputs, type AiModel, type AiProvider, type GenerationMode, type ImageInput, type ReferenceImage } from "./imageGeneration";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
