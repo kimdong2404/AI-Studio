@@ -90,7 +90,7 @@ Các trường *_code(s) phải dùng đúng MÃ (code trong ngoặc) của tài
 KỊCH BẢN:
 ${script}`;
 
-async function callGemini(text: string): Promise<unknown> {
+async function callGemini(promptText: string): Promise<unknown> {
   const key = getKey(GEMINI_KEY);
   if (!key) throw new MissingKeyError();
   let lastErr = "";
@@ -99,7 +99,7 @@ async function callGemini(text: string): Promise<unknown> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text }] }],
+        contents: [{ role: "user", parts: [{ text: promptText }] }],
         generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
       }),
     });
@@ -141,7 +141,7 @@ export async function analyzeWithGemini(script: string, assets: Asset[] = [], se
       props: "—",
       camera: String(r.camera ?? "Trung cảnh"),
       duration: /^\d+(\.\d+)?$/.test(d) ? `${d} giây` : d || "4 giây",
-      location_id: pick(r.location_code, "location")[0] ?? (selLoc.length === 1 ? selLoc[0].id : null),
+      location_id: pick(r.location_code, "location")[0] ?? (selLoc.length === 1 ? selLoc[0]!.id : null),
       action: String(r.prompt ?? ""),
       expression: "",
       camera_movement: "",
