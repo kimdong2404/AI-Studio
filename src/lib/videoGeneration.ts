@@ -160,7 +160,9 @@ export type GenerateVideoInput = {
   settings: VideoSettings & { duration: string };
 };
 export type GenerateVideoResult = { video_url: string; thumbnail_url?: string };
-export type VideoProviderAdapter = (input: GenerateVideoInput) => Promise<GenerateVideoResult>;
+/** Provider luôn nhận ảnh tham chiếu dạng base64 (Image-to-Video reference), không chỉ text. */
+export type ProviderVideoInput = GenerateVideoInput & { imageInputs: ImageInput[] };
+export type VideoProviderAdapter = (input: ProviderVideoInput) => Promise<GenerateVideoResult>;
 const adapters: Record<string, VideoProviderAdapter> = {};
 /** A provider (e.g. Google Veo) plugs in here later, server-side; keys never live in the browser. */
 export function registerVideoProvider(code: string, adapter: VideoProviderAdapter) {
@@ -177,5 +179,9 @@ export class VideoNotConnectedError extends Error {
 export async function generateVideo(input: GenerateVideoInput): Promise<GenerateVideoResult> {
   const adapter = input.provider ? adapters[input.provider.code] : undefined;
   if (!input.provider || !input.model || !adapter) throw new VideoNotConnectedError();
-  return adapter(input);
+  const refs = [...input.referenceImages];
+  for (const [url, role] of [[input.sourceImage, "source"], [input.firstFrame, "first_frame"], [input.lastFrame, "last_frame"]] as const)
+    if (url && !refs.some((r) => r.url === url)) refs.push({ url, assetName: role, kind: "frame", role });
+  if (!refs.length) throw new Error("Cảnh chưa có ảnh tham chiếu — hãy đính kèm tài nguyên trước khi tạo video.");
+  return adapter({ ...input, imageInputs: await toImageInputs(refs) });
 }

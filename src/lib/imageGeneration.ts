@@ -61,10 +61,12 @@ export type GenerateImageInput = {
   referenceImages: ReferenceImage[];
   settings: ImageSettings;
 };
+/** Ảnh tham chiếu đã chuyển sang base64 — luôn được gửi kèm prompt. */
+export type ProviderImageInput = GenerateImageInput & { imageInputs: ImageInput[] };
 export type GenerateImageResult = { images: string[] };
 
 /** A provider implementation plugs in here later (registered by provider code). */
-export type ProviderAdapter = (input: GenerateImageInput) => Promise<GenerateImageResult>;
+export type ProviderAdapter = (input: ProviderImageInput) => Promise<GenerateImageResult>;
 const adapters: Record<string, ProviderAdapter> = {};
 export function registerProvider(code: string, adapter: ProviderAdapter) {
   adapters[code] = adapter;
@@ -80,5 +82,25 @@ export class NotConnectedError extends Error {
 export async function generateImage(input: GenerateImageInput): Promise<GenerateImageResult> {
   const adapter = input.provider ? adapters[input.provider.code] : undefined;
   if (!input.provider || !input.model || !adapter) throw new NotConnectedError();
-  return adapter(input);
+  if (!input.referenceImages.length) throw new Error("Cảnh chưa có ảnh tham chiếu — hãy đính kèm tài nguyên trước khi tạo ảnh.");
+  return adapter({ ...input, imageInputs: await toImageInputs(input.referenceImages) });
 }
+
+/** Tải ảnh tham chiếu (signed URL) thành base64 data URL để gửi làm Image Input cho provider. */
+export async function toImageInputs(refs: Array<{ url: string; assetName: string; kind: string; role: string }>) {
+  return Promise.all(
+    refs.map(async (r) => {
+      if (r.url.startsWith("data:")) return { ...r, base64: r.url };
+      const blob = await (await fetch(r.url)).blob();
+      const base64 = await new Promise<string>((ok, bad) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(String(fr.result));
+        fr.onerror = () => bad(fr.error);
+        fr.readAsDataURL(blob);
+      });
+      return { ...r, base64 };
+    }),
+  );
+}
+export type ImageInput = Awaited<ReturnType<typeof toImageInputs>>[number];
+
