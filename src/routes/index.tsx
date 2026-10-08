@@ -123,7 +123,7 @@ function StudioPage() {
     setAnalyzeError(null);
     setSection("storyboard");
     try {
-      const next = await analyzeWithGemini(script);
+      const next = await analyzeWithGemini(script, assets);
       setScenes(next);
       await run(() => replaceScenes(next));
     } catch (e) {
