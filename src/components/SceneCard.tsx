@@ -3,6 +3,7 @@ import type { Scene } from "@/lib/storyboard";
 import { masterUrl, type Asset, type AssetType } from "@/lib/assets";
 import { AssetPicker } from "./AssetPicker";
 import type { ExpressionLite } from "@/lib/characterSheet";
+import { syncAssetText } from "@/lib/gemini";
 
 type Props = {
   scene: Scene;
@@ -94,7 +95,7 @@ export function SceneCard({ scene, index, delay, assets = [], expressions = [], 
           return [cid, ex && expressions.some((x) => x.id === ex && x.character_id === cid) ? ex : null];
         }),
       );
-      await onSave({ ...draft, character_expressions: valid });
+      await onSave(syncAssetText({ ...draft, character_expressions: valid }, assets));
       setDraft(null);
     } catch (e) {
       console.error("[scene save]", e);
@@ -253,12 +254,12 @@ export function SceneCard({ scene, index, delay, assets = [], expressions = [], 
             <h3 className="mb-1 font-display text-lg tracking-tight">{scene.title}</h3>
             <p className="mb-3 text-xs leading-relaxed text-muted-ink">{scene.description}</p>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              {FIELDS.map(({ key, label, wide }) => (
+              {(() => { const shown = syncAssetText(scene, assets); return FIELDS.map(({ key, label, wide }) => (
                 <div key={key} className={wide ? "col-span-2" : undefined}>
                   <dt className="text-muted-ink">{label}</dt>
-                  <dd className="font-medium">{scene[key]}</dd>
+                  <dd className="font-medium">{shown[key]}</dd>
                 </div>
-              ))}
+              )); })()}
             </dl>
             {(scene.action || scene.camera_movement) && (
               <div className="mt-3 space-y-1 text-xs">

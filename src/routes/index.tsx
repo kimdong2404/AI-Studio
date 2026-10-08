@@ -9,7 +9,7 @@ import { AssetLibrary } from "@/components/AssetLibrary";
 import { PromptBuilder } from "@/components/PromptBuilder";
 import { ImageGeneration } from "@/components/ImageGeneration";
 import { SettingsDialog } from "@/components/SettingsDialog";
-import { analyzeWithGemini, GEMINI_KEY, getKey, MissingKeyError } from "@/lib/gemini";
+import { analyzeWithGemini, GEMINI_KEY, getKey, MissingKeyError, rewriteScenePrompt } from "@/lib/gemini";
 import { VideoGeneration } from "@/components/VideoGeneration";
 import { deleteProp, saveProp, useProps } from "@/lib/props";
 import { fetchAllExpressionsLite, type ExpressionLite } from "@/lib/characterSheet";
@@ -123,7 +123,8 @@ function StudioPage() {
     setAnalyzeError(null);
     setSection("storyboard");
     try {
-      const next = await analyzeWithGemini(script, assets);
+      const used = new Set(scenes.flatMap((sc) => [...sc.character_ids, ...sc.ingredient_ids, ...sc.prop_ids, ...(sc.location_id ? [sc.location_id] : [])]));
+      const next = await analyzeWithGemini(script, assets, assets.filter((a) => used.has(a.id)));
       setScenes(next);
       await run(() => replaceScenes(next));
     } catch (e) {
@@ -156,9 +157,20 @@ function StudioPage() {
     });
   };
 
-  const regenerateScene = (id: string) => {
+  const regenerateScene = async (id: string) => {
     const s = scenes.find((x) => x.id === id);
     if (!s) return;
+    if (getKey(GEMINI_KEY)) {
+      try {
+        const upd = { ...s, action: await rewriteScenePrompt(s, assets) };
+        setScenes((prev) => prev.map((x) => (x.id === id ? upd : x)));
+        await run(() => saveScene(upd, scenes.indexOf(s)));
+      } catch (e) {
+        console.error("[gemini rewrite]", e);
+        setAnalyzeError(`Không viết lại được prompt: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
     const upd = {
       ...s,
       camera: CAMERAS[(CAMERAS.indexOf(s.camera) + 1) % CAMERAS.length] ?? s.camera,
@@ -375,7 +387,7 @@ function StudioPage() {
                       expressions={expressions}
                       onSave={updateScene}
                       onDuplicate={() => duplicateScene(scene.id)}
-                      onRegenerate={() => regenerateScene(scene.id)}
+                      onRegenerate={() => void regenerateScene(scene.id)}
                     />
                   ))}
                 </div>
