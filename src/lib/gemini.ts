@@ -3,7 +3,7 @@ import { nextId, type Scene } from "@/lib/storyboard";
 
 export const GEMINI_KEY = "GEMINI_API_KEY";
 export const HF_KEY = "HF_TOKEN";
-const MODELS = ["gemini-1.5-flash", "gemini-2.5-flash"]; // fallback if 1.5 is retired
+const MODELS = ["gemini-1.5-flash", "gemini-2.5-flash"]; // gemini-1.5-flash first; 2.5 only if Google reports 1.5 as unavailable (404)
 
 export const getKey = (k: string) => (typeof window === "undefined" ? "" : localStorage.getItem(k) ?? "");
 export const setKey = (k: string, v: string) => (v.trim() ? localStorage.setItem(k, v.trim()) : localStorage.removeItem(k));
@@ -90,12 +90,22 @@ Các trường *_code(s) phải dùng đúng MÃ (code trong ngoặc) của tài
 KỊCH BẢN:
 ${script}`;
 
-async function callGemini(promptText: string): Promise<unknown> {
+export type RetryNotice = (attempt: number, max: number, waitSec: number) => void;
+const RETRY_DELAYS = [2, 4, 6];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const isOverload = (status: number, msg: string) =>
+  status === 429 || status === 503 || /high demand|overloaded|unavailable|resource.?exhausted/i.test(msg);
+
+async function callGemini(promptText: string, onRetry?: RetryNotice): Promise<unknown> {
   const key = getKey(GEMINI_KEY);
   if (!key) throw new MissingKeyError();
   let lastErr = "";
   for (const model of MODELS) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+    let attempt = 0;
+    let res: Response;
+    let body: any;
+    for (;;) {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -103,12 +113,25 @@ async function callGemini(promptText: string): Promise<unknown> {
         generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
       }),
     });
+    body = res.status === 404 ? null : await res.json().catch(() => null);
+    const msg = String(body?.error?.message ?? "");
+    if (!res.ok && isOverload(res.status, msg) && attempt < RETRY_DELAYS.length) {
+      const wait = RETRY_DELAYS[attempt]!;
+      attempt++;
+      onRetry?.(attempt, RETRY_DELAYS.length, wait);
+      await sleep(wait * 1000);
+      continue;
+    }
+    break;
+    }
     if (res.status === 404) {
       lastErr = `Model ${model} không khả dụng.`;
       continue;
     }
-    const body = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(body?.error?.message ?? `Gemini lỗi ${res.status}`);
+    if (!res.ok) {
+      const m = body?.error?.message ?? `Gemini lỗi ${res.status}`;
+      throw new Error(isOverload(res.status, m) ? `Google Gemini đang quá tải, đã thử lại ${RETRY_DELAYS.length} lần. ${m}` : m);
+    }
     const text: string = body?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
     const json = text.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
     try {
@@ -121,8 +144,8 @@ async function callGemini(promptText: string): Promise<unknown> {
 }
 
 
-export async function analyzeWithGemini(script: string, assets: Asset[] = [], selected: Asset[] = []): Promise<Scene[]> {
-  const parsed = (await callGemini(PROMPT(script, buildAssetContext(assets), selectedContext(selected)))) as { scenes?: Raw[] } | Raw[];
+export async function analyzeWithGemini(script: string, assets: Asset[] = [], selected: Asset[] = [], onRetry?: RetryNotice): Promise<Scene[]> {
+  const parsed = (await callGemini(PROMPT(script, buildAssetContext(assets), selectedContext(selected)), onRetry)) as { scenes?: Raw[] } | Raw[];
   const arr = Array.isArray(parsed) ? parsed : parsed?.scenes;
   if (!Array.isArray(arr)) throw new Error("Gemini trả về dữ liệu không đúng định dạng JSON.");
   const byCode = new Map(assets.map((a) => [a.code.toUpperCase(), a]));
@@ -161,7 +184,7 @@ export async function analyzeWithGemini(script: string, assets: Asset[] = [], se
 }
 
 /** Viết lại prompt tiếng Anh của 1 cảnh theo đúng tài nguyên đang đính kèm trong thẻ. */
-export async function rewriteScenePrompt(scene: Scene, assets: Asset[]): Promise<string> {
+export async function rewriteScenePrompt(scene: Scene, assets: Asset[], onRetry?: RetryNotice): Promise<string> {
   const ids = new Set([...(scene.character_ids ?? []), ...(scene.ingredient_ids ?? []), ...(scene.prop_ids ?? []), ...(scene.location_id ? [scene.location_id] : [])]);
   const attached = assets.filter((a) => ids.has(a.id));
   const text = `Bạn là Chuyên gia Prompt Engineer cho Midjourney & Sora.
@@ -178,7 +201,7 @@ Góc máy: ${scene.camera}. Chuyển động: ${scene.camera_movement || "tự c
 Prompt cũ (có thể sai bối cảnh, chỉ tham khảo hành động): ${scene.action}
 
 Trả về JSON: {"prompt": "..."}`;
-  const r = (await callGemini(text)) as { prompt?: unknown };
+  const r = (await callGemini(text, onRetry)) as { prompt?: unknown };
   const p = String(r?.prompt ?? "").trim();
   if (!p) throw new Error("Gemini không trả về prompt.");
   return p;

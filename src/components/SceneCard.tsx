@@ -36,7 +36,7 @@ type ExtraKey = "camera" | "action" | "expression" | "camera_movement" | "lighti
 type FieldDef = { key: ExtraKey; label: string; options?: string[]; long?: boolean; ph?: string };
 const SECTIONS: Array<{ n: string; t: string; fields: FieldDef[] }> = [
   { n: "③", t: "Hành động & diễn xuất", fields: [
-    { key: "action", label: "Hành động", long: true, ph: "VD: Mèo bước vào vườn, nhìn quanh rồi tiến đến luống cải." },
+    { key: "action", label: "✍️ Prompt tiếng Anh (tự sửa thoải mái)", long: true, ph: "VD: A golden cat walks into a lush garden..." },
     { key: "expression", label: "Biểu cảm / trạng thái", ph: "VD: Vui vẻ, tò mò" },
   ] },
   { n: "④", t: "Camera", fields: [
@@ -132,10 +132,11 @@ export function SceneCard({ scene, index, delay, assets = [], expressions = [], 
               className="w-full rounded-xl border border-line bg-background px-3 py-2 text-sm font-semibold focus:border-accent focus:outline-none"
               placeholder="Tiêu đề cảnh"
             />
+            <span className="block text-[11px] text-muted-ink">📝 Kịch bản tiếng Việt</span>
             <textarea
               value={draft.description}
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-              rows={2}
+              rows={4}
               className="w-full resize-none rounded-xl border border-line bg-background px-3 py-2 text-xs leading-relaxed focus:border-accent focus:outline-none"
               placeholder="Mô tả cảnh"
             />
@@ -219,7 +220,7 @@ export function SceneCard({ scene, index, delay, assets = [], expressions = [], 
                     <span className="mb-1 block text-[11px] text-muted-ink">{f.label}</span>
                     {f.long ? (
                       <textarea
-                        rows={2}
+                        rows={f.key === "action" ? 8 : 2}
                         value={draft[f.key] ?? ""}
                         onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
                         placeholder={f.ph}
@@ -263,7 +264,7 @@ export function SceneCard({ scene, index, delay, assets = [], expressions = [], 
             </dl>
             {(scene.action || scene.camera_movement) && (
               <div className="mt-3 space-y-1 text-xs">
-                {scene.action && <p className="line-clamp-2"><span className="text-muted-ink">🎬 Hành động:</span> {scene.action}</p>}
+                {scene.action && <p className="line-clamp-3"><span className="text-muted-ink">✍️ Prompt:</span> {scene.action}</p>}
                 <p><span className="text-muted-ink">🎥 Camera:</span> {[scene.camera, scene.camera_movement].filter(Boolean).join(" · ")}</p>
               </div>
             )}
