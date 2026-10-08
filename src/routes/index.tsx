@@ -8,6 +8,8 @@ import { SceneCard } from "@/components/SceneCard";
 import { AssetLibrary } from "@/components/AssetLibrary";
 import { PromptBuilder } from "@/components/PromptBuilder";
 import { ImageGeneration } from "@/components/ImageGeneration";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { analyzeWithGemini, GEMINI_KEY, getKey, MissingKeyError } from "@/lib/gemini";
 import { VideoGeneration } from "@/components/VideoGeneration";
 import { deleteProp, saveProp, useProps } from "@/lib/props";
 import { fetchAllExpressionsLite, type ExpressionLite } from "@/lib/characterSheet";
@@ -82,6 +84,9 @@ function StudioPage() {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const characters = useCharacters();
   const locations = useLocations();
   const ingredients = useIngredients();
@@ -108,16 +113,29 @@ function StudioPage() {
 
   const workspaceVisible = section === "script" || section === "storyboard";
 
-  const analyze = () => {
-    if (!script.trim()) return;
+  const analyze = async () => {
+    if (!script.trim() || analyzing) return;
+    if (!getKey(GEMINI_KEY)) {
+      setSettingsNotice("Vui lòng nhập GEMINI_API_KEY để phân tích kịch bản.");
+      setSettingsOpen(true);
+      return;
+    }
     setAnalyzing(true);
+    setAnalyzeError(null);
     setSection("storyboard");
-    window.setTimeout(() => {
-      const next = analyzeScript(script);
+    try {
+      const next = await analyzeWithGemini(script);
       setScenes(next);
+      await run(() => replaceScenes(next));
+    } catch (e) {
+      console.error("[gemini]", e);
+      if (e instanceof MissingKeyError) {
+        setSettingsNotice("Vui lòng nhập GEMINI_API_KEY.");
+        setSettingsOpen(true);
+      } else setAnalyzeError(`Phân tích thất bại: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
       setAnalyzing(false);
-      void run(() => replaceScenes(next));
-    }, 700);
+    }
   };
 
   const updateScene = async (updated: Scene) => {
@@ -230,10 +248,14 @@ function StudioPage() {
             </div>
             <div className="ml-auto flex items-center gap-3">
               <span className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent">
-                <span className="size-1.5 rounded-full bg-accent" />
+                <span className={`size-1.5 rounded-full bg-accent ${analyzing ? "animate-pulse" : ""}`} />
                 {analyzing ? "Đang phân tích…" : "Sẵn sàng"}
               </span>
+              <Button variant="outline" onClick={() => { setSettingsNotice(null); setSettingsOpen(true); }}>
+                <span aria-hidden="true">⚙️</span> Cài đặt
+              </Button>
             </div>
+            <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} notice={settingsNotice} />
           </div>
         </header>
 
@@ -328,6 +350,8 @@ function StudioPage() {
               </div>
 
               {actionNotice && <p role="status" className="mb-4 rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted-ink">{actionNotice}</p>}
+              {analyzing && <p role="status" className="mb-4 animate-pulse rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted-ink">⏳ Gemini đang phân tích kịch bản…</p>}
+              {analyzeError && <p role="alert" className="mb-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{analyzeError}</p>}
               {dbError && (
                 <p className="mb-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{dbError}</p>
               )}
