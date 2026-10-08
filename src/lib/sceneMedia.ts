@@ -1,10 +1,10 @@
 import { masterUrl, type Asset } from "@/lib/assets";
 import type { Scene } from "@/lib/storyboard";
-import { getKey, HF_KEY } from "@/lib/gemini";
+import { getKey, HF_KEY, HF_MODEL_KEY, DEFAULT_HF_MODEL } from "@/lib/gemini";
 
-/** Free text-to-image models on Hugging Face Inference (router). Tried in order — the first available one wins. */
-export const HF_IMAGE_MODELS = ["stabilityai/stable-diffusion-xl-base-1.0", "black-forest-labs/FLUX.1-schnell"];
-const HF_URL = (model: string) => `https://router.huggingface.co/hf-inference/models/${model}`;
+/** Model ID comes from Settings (localStorage) — never hard-coded here. */
+export const getHfModel = () => getKey(HF_MODEL_KEY) || DEFAULT_HF_MODEL;
+const HF_URL = (model: string) => `https://api-inference.huggingface.co/models/${model}`;
 
 export class MissingHfTokenError extends Error {
   constructor() {
@@ -40,40 +40,35 @@ export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus
   if (!token) throw new MissingHfTokenError();
   const prompt = buildImagePrompt(scene, assets);
   const delays = [2, 4, 6];
-  let lastErr = "";
-  for (const model of HF_IMAGE_MODELS) {
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch(HF_URL(model), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "image/png" },
-        body: JSON.stringify({ inputs: prompt, parameters: { width: 1024, height: 576 } }),
+  const model = getHfModel();
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(HF_URL(model), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "image/png" },
+      body: JSON.stringify({ inputs: prompt, parameters: { width: 1024, height: 576 } }),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      return await new Promise<string>((ok, bad) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(String(fr.result));
+        fr.onerror = () => bad(fr.error);
+        fr.readAsDataURL(blob);
       });
-      if (res.ok) {
-        const blob = await res.blob();
-        return await new Promise<string>((ok, bad) => {
-          const fr = new FileReader();
-          fr.onload = () => ok(String(fr.result));
-          fr.onerror = () => bad(fr.error);
-          fr.readAsDataURL(blob);
-        });
-      }
-      const body = await res.json().catch(() => null);
-      const msg = String(body?.error ?? `Hugging Face lỗi ${res.status}`);
-      if ((res.status === 503 || res.status === 429) && attempt < delays.length) {
-        onStatus?.(`Đang thử lại... (lần ${attempt + 1}/${delays.length})`);
-        await sleep(delays[attempt]! * 1000);
-        continue;
-      }
-      if (res.status === 401 || res.status === 403) throw new Error("Hugging Face Token không hợp lệ hoặc thiếu quyền Inference.");
-      // Model gone (deprecated/404) → try the next model in the list.
-      if (res.status === 404 || res.status === 410 || /deprecated|not found|does not exist/i.test(msg)) {
-        lastErr = `Model ${model} không còn khả dụng.`;
-        break;
-      }
-      throw new Error(msg);
     }
+    const body = await res.json().catch(() => null);
+    const msg = String(body?.error ?? `Hugging Face lỗi ${res.status}`);
+    if ((res.status === 503 || res.status === 429) && attempt < delays.length) {
+      onStatus?.(`Đang thử lại... (lần ${attempt + 1}/${delays.length})`);
+      await sleep(delays[attempt]! * 1000);
+      continue;
+    }
+    if (res.status === 401 || res.status === 403) throw new Error("Hugging Face Token không hợp lệ hoặc thiếu quyền Inference.");
+    if (res.status === 404 || res.status === 410 || /deprecated|not found|does not exist/i.test(msg)) {
+      throw new Error(`Model "${model}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID.`);
+    }
+    throw new Error(msg);
   }
-  throw new Error(lastErr || "Không gọi được Hugging Face.");
 }
 
 /* ---------- local persistence (images are large → best effort) ---------- */
