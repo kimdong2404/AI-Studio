@@ -7,8 +7,31 @@ export const HF_MODEL_KEY = "HF_MODEL_ID";
 export const DEFAULT_HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0";
 const MODELS = ["gemini-1.5-flash", "gemini-2.5-flash"]; // gemini-1.5-flash first; 2.5 only if Google reports 1.5 as unavailable (404)
 
-export const getKey = (k: string) => (typeof window === "undefined" ? "" : localStorage.getItem(k) ?? "");
-export const setKey = (k: string, v: string) => (v.trim() ? localStorage.setItem(k, v.trim()) : localStorage.removeItem(k));
+/* Keys persist in localStorage, mirrored to a 1-year cookie as a fallback (some preview iframes clear/partition storage). */
+const readCookie = (k: string) => {
+  const m = document.cookie.match(new RegExp(`(?:^|; )${k}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]!) : "";
+};
+const writeCookie = (k: string, v: string) => {
+  document.cookie = `${k}=${encodeURIComponent(v)}; path=/; max-age=${v ? 31536000 : 0}; SameSite=Lax`;
+};
+export const getKey = (k: string): string => {
+  if (typeof window === "undefined") return "";
+  let v = "";
+  try { v = localStorage.getItem(k) ?? ""; } catch { /* storage blocked */ }
+  if (!v) {
+    try {
+      v = readCookie(k);
+      if (v) localStorage.setItem(k, v); // restore
+    } catch { /* ignore */ }
+  }
+  return v;
+};
+export const setKey = (k: string, v: string) => {
+  const val = v.trim();
+  try { val ? localStorage.setItem(k, val) : localStorage.removeItem(k); } catch { /* storage blocked */ }
+  try { writeCookie(k, val); } catch { /* ignore */ }
+};
 
 export class MissingKeyError extends Error {
   constructor() {

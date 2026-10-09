@@ -1,10 +1,10 @@
 import { masterUrl, type Asset } from "@/lib/assets";
 import type { Scene } from "@/lib/storyboard";
 import { getKey, HF_KEY, HF_MODEL_KEY, DEFAULT_HF_MODEL } from "@/lib/gemini";
+import { hfGenerateImage } from "@/lib/hfImage.functions";
 
 /** Model ID comes from Settings (localStorage) — never hard-coded here. */
 export const getHfModel = () => getKey(HF_MODEL_KEY) || DEFAULT_HF_MODEL;
-const HF_URL = (model: string) => `https://api-inference.huggingface.co/models/${model}`;
 
 export class MissingHfTokenError extends Error {
   constructor() {
@@ -34,40 +34,36 @@ export function buildImagePrompt(scene: Scene, assets: Asset[]): string {
   return refs.length ? `${base}\n\nStrictly maintain visual consistency with these references: ${refs.join("; ")}` : base;
 }
 
-/** Calls Hugging Face, returns a data URL of the generated image. Retries while the model is loading / overloaded. */
+/** Calls Hugging Face via our server (no CORS). Handles cold start: waits estimated_time then retries (max 3). */
 export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus?: (msg: string) => void): Promise<string> {
   const token = getHfToken();
   if (!token) throw new MissingHfTokenError();
   const prompt = buildImagePrompt(scene, assets);
-  const delays = [2, 4, 6];
   const model = getHfModel();
+  const MAX = 3;
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(HF_URL(model), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "image/png" },
-      body: JSON.stringify({ inputs: prompt, parameters: { width: 1024, height: 576 } }),
-    });
-    if (res.ok) {
-      const blob = await res.blob();
-      return await new Promise<string>((ok, bad) => {
-        const fr = new FileReader();
-        fr.onload = () => ok(String(fr.result));
-        fr.onerror = () => bad(fr.error);
-        fr.readAsDataURL(blob);
-      });
+    let r: Awaited<ReturnType<typeof hfGenerateImage>>;
+    try {
+      r = await hfGenerateImage({ data: { token, model, prompt } });
+    } catch (e) {
+      throw new Error(`Không kết nối được máy chủ tạo ảnh: ${e instanceof Error ? e.message : String(e)}`);
     }
-    const body = await res.json().catch(() => null);
-    const msg = String(body?.error ?? `Hugging Face lỗi ${res.status}`);
-    if ((res.status === 503 || res.status === 429) && attempt < delays.length) {
-      onStatus?.(`Đang thử lại... (lần ${attempt + 1}/${delays.length})`);
-      await sleep(delays[attempt]! * 1000);
+    if (r.ok) return r.dataUrl;
+    const { status, error: msg, estimated_time } = r;
+    const loading = estimated_time != null || /loading/i.test(msg);
+    if ((loading || status === 503 || status === 429) && attempt < MAX) {
+      const wait = Math.min(Math.max(Math.ceil(estimated_time ?? [5, 10, 20][attempt]!), 2), 120);
+      for (let s = wait; s > 0; s--) {
+        onStatus?.(loading ? `Đang tải mô hình, vui lòng chờ ${s} giây... (lần ${attempt + 1}/${MAX})` : `Hugging Face quá tải (${status}), thử lại sau ${s} giây... (lần ${attempt + 1}/${MAX})`);
+        await sleep(1000);
+      }
       continue;
     }
-    if (res.status === 401 || res.status === 403) throw new Error("Hugging Face Token không hợp lệ hoặc thiếu quyền Inference.");
-    if (res.status === 404 || res.status === 410 || /deprecated|not found|does not exist/i.test(msg)) {
-      throw new Error(`Model "${model}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID.`);
+    if (status === 401 || status === 403) throw new Error(`Lỗi ${status}: Hugging Face Token không hợp lệ hoặc thiếu quyền Inference. (${msg})`);
+    if (status === 404 || status === 410 || /deprecated|not found|does not exist/i.test(msg)) {
+      throw new Error(`Lỗi ${status}: Model "${model}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID. (${msg})`);
     }
-    throw new Error(msg);
+    throw new Error(`Hugging Face lỗi ${status || "mạng"}: ${msg}`);
   }
 }
 
