@@ -8,7 +8,7 @@ export const hfGenerateImage = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     try {
-      const res = await fetch(`https://api-inference.huggingface.co/models/${data.model}`, {
+      const res = await fetch(`https://router.huggingface.co/hf-inference/models/${data.model}`, {
         method: "POST",
         headers: { Authorization: "Bearer " + data.token, "Content-Type": "application/json", Accept: "image/png", "x-wait-for-model": "true" },
         body: JSON.stringify({ inputs: data.prompt, parameters: { width: 1024, height: 576 } }),

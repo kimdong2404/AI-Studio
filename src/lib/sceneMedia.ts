@@ -3,7 +3,14 @@ import type { Scene } from "@/lib/storyboard";
 import { getKey, HF_KEY, HF_MODEL_KEY, DEFAULT_HF_MODEL } from "@/lib/gemini";
 
 /** Model ID comes from Settings (localStorage) — never hard-coded here. */
-export const getHfModel = () => getKey(HF_MODEL_KEY) || DEFAULT_HF_MODEL;
+export const getHfModel = () => {
+  // Accept a bare ID or a pasted URL; keep only "owner/model".
+  const raw = (getKey(HF_MODEL_KEY) || "").trim().replace(/^https?:\/\/[^/]+\/(hf-inference\/)?(models\/)?/, "").replace(/\/+$/, "");
+  return raw || DEFAULT_HF_MODEL;
+};
+
+/** Hugging Face retired api-inference.huggingface.co (it no longer responds → "Failed to fetch"). */
+export const HF_INFERENCE_BASE = "https://router.huggingface.co/hf-inference/models/";
 
 export class MissingHfTokenError extends Error {
   constructor() {
@@ -53,7 +60,7 @@ export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus
   if (!hfToken) throw new MissingHfTokenError();
   const modelId = getHfModel();
   const prompt = buildImagePrompt(scene, assets);
-  const url = `https://api-inference.huggingface.co/models/${modelId}`;
+  const url = `${HF_INFERENCE_BASE}${modelId}`;
 
   try {
     for (let attempt = 1; attempt <= 4; attempt++) {
@@ -93,7 +100,12 @@ export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus
         if (response.status === 404 || response.status === 410) {
           throw new Error(`Lỗi ${response.status}: Model "${modelId}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID.`);
         }
-        throw new Error(`Hugging Face lỗi ${response.status}: ${response.statusText || "Không rõ nguyên nhân"}`);
+        let detail = response.statusText || "Không rõ nguyên nhân";
+        try {
+          const t = await response.text();
+          try { detail = String(JSON.parse(t).error ?? detail); } catch { if (t && !t.startsWith("<")) detail = t.slice(0, 300); }
+        } catch { /* ignore */ }
+        throw new Error(`Hugging Face lỗi ${response.status}: ${detail}`);
       }
 
       // Success: read as Blob, make an object URL for immediate display.
