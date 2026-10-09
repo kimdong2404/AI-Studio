@@ -23,6 +23,7 @@ export function SettingsDialog({ open, onOpenChange, notice }: { open: boolean; 
           <DialogDescription>Khóa được lưu trong trình duyệt này (localStorage), không gửi lên máy chủ của ứng dụng.</DialogDescription>
         </DialogHeader>
         {notice && <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{notice}</p>}
+        <p className="text-xs text-muted-ink">Gemini: {gemini ? "✅ đã lưu" : "chưa có"} · Hugging Face: {hf ? "✅ đã lưu" : "chưa có"}</p>
         <div className="grid gap-4">
           <div>
             <label htmlFor="gemini-key" className="mb-1.5 block text-sm font-semibold">GEMINI_API_KEY</label>
