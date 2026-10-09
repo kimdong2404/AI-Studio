@@ -51,76 +51,85 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
- * Calls Hugging Face Inference directly from the browser.
- * - Retries up to 4 attempts; on 503 (model loading) waits `estimated_time` then retries.
- * - Reads the successful response as a Blob → object URL for display + data URL for storage.
+ * Calls Hugging Face Inference directly from the browser, with automatic model fallback:
+ * - Outer loop walks a fallback list (user's model from Settings first, then free backups).
+ * - Inner loop retries each model twice on 503 (cold start), waiting `estimated_time`.
+ * - 400/401/410/429 or a failed fetch breaks to the next model immediately.
+ * - On success: Blob → object URL for display + data URL for storage, then return.
  */
 export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus?: (msg: string) => void): Promise<string> {
   const hfToken = getHfToken();
   if (!hfToken) throw new MissingHfTokenError();
-  const modelId = getHfModel();
   const prompt = buildImagePrompt(scene, assets);
-  const url = `${HF_INFERENCE_BASE}${modelId}`;
+
+  // Fallback chain: the model from Settings first, then stable free backups (deduped).
+  const modelsToTry = [
+    ...new Set([
+      getHfModel(),
+      "Lykon/dreamshaper-8",
+      "runwayml/stable-diffusion-v1-5",
+      "prompthero/openjourney-v4",
+    ]),
+  ].filter(Boolean);
 
   try {
-    for (let attempt = 1; attempt <= 4; attempt++) {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + hfToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inputs: prompt }),
-      });
+    for (const currentModel of modelsToTry) {
+      onStatus?.(`Đang thử: ${currentModel}...`);
 
-      if (!response.ok) {
+      // Inner loop: cold-start retry (2 attempts) for the current model.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        let response: Response;
+        try {
+          response = await fetch(`${HF_INFERENCE_BASE}${currentModel}`, {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + hfToken,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ inputs: prompt }),
+          });
+        } catch (fetchError) {
+          // Fetch failed (network/CORS) — skip straight to the next model.
+          console.error(`[generateSceneImage] ${currentModel} fetch failed:`, fetchError);
+          break;
+        }
+
+        if (response.ok) {
+          // Success: read as Blob, make an object URL for immediate display.
+          const blob = await response.blob();
+          if (!blob.type.startsWith("image/")) {
+            throw new Error(`Hugging Face trả về dữ liệu không phải ảnh (${blob.type || "không rõ"}).`);
+          }
+          const imageUrl = URL.createObjectURL(blob);
+          // Persist a data-URL copy so the image survives reload (blob URLs don't).
+          try {
+            storeSceneImage(scene.id, await blobToDataUrl(blob));
+          } catch { /* best effort */ }
+          return imageUrl;
+        }
+
         if (response.status === 503) {
-          // Model is loading (cold start) — wait the estimated time, then retry.
+          // Model is loading (cold start) — wait the estimated time, then retry this model.
           let estimated = 10;
           try {
             const j = await response.json();
             if (typeof j.estimated_time === "number") estimated = Math.max(2, Math.ceil(j.estimated_time));
           } catch { /* body wasn't JSON — keep default */ }
           for (let s = estimated; s > 0; s--) {
-            onStatus?.(`Mô hình đang khởi động, chờ ${s} giây... (lần ${attempt}/4)`);
+            onStatus?.(`Mô hình ${currentModel} đang khởi động, chờ ${s} giây... (lần ${attempt}/2)`);
             await sleep(1000);
           }
           continue;
         }
-        if (response.status === 429 && attempt < 4) {
-          for (let s = 6; s > 0; s--) {
-            onStatus?.(`Hugging Face quá tải (429), thử lại sau ${s} giây... (lần ${attempt}/4)`);
-            await sleep(1000);
-          }
-          continue;
-        }
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(`Lỗi ${response.status}: Hugging Face Token không hợp lệ hoặc thiếu quyền Inference.`);
-        }
-        if (response.status === 404 || response.status === 410) {
-          throw new Error(`Lỗi ${response.status}: Model "${modelId}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID.`);
-        }
-        let detail = response.statusText || "Không rõ nguyên nhân";
-        try {
-          const t = await response.text();
-          try { detail = String(JSON.parse(t).error ?? detail); } catch { if (t && !t.startsWith("<")) detail = t.slice(0, 300); }
-        } catch { /* ignore */ }
-        throw new Error(`Hugging Face lỗi ${response.status}: ${detail}`);
-      }
 
-      // Success: read as Blob, make an object URL for immediate display.
-      const blob = await response.blob();
-      if (!blob.type.startsWith("image/")) {
-        throw new Error(`Hugging Face trả về dữ liệu không phải ảnh (${blob.type || "không rõ"}).`);
+        // 400/401/410/429 or anything else — break to the next model.
+        const detail = await response.text().catch(() => "");
+        console.error(`[generateSceneImage] ${currentModel} HTTP ${response.status}: ${detail.slice(0, 300)}`);
+        break;
       }
-      const imageUrl = URL.createObjectURL(blob);
-      // Persist a data-URL copy so the image survives reload (blob URLs don't).
-      try {
-        storeSceneImage(scene.id, await blobToDataUrl(blob));
-      } catch { /* best effort */ }
-      return imageUrl;
+      // This model failed — the outer loop moves to the next one automatically.
     }
-    throw new Error("Mô hình vẫn đang khởi động sau 4 lần thử — vui lòng bấm Tạo ảnh lại sau ít phút.");
+    throw new Error("Tất cả các mô hình đều đang quá tải hoặc hết Quota. Vui lòng thử lại sau.");
   } catch (e) {
     console.error("[generateSceneImage]", e);
     throw e;
