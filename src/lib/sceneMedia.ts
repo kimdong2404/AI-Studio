@@ -1,7 +1,6 @@
 import { masterUrl, type Asset } from "@/lib/assets";
 import type { Scene } from "@/lib/storyboard";
 import { getKey, HF_KEY, HF_MODEL_KEY, DEFAULT_HF_MODEL } from "@/lib/gemini";
-import { hfGenerateImage } from "@/lib/hfImage.functions";
 
 /** Model ID comes from Settings (localStorage) — never hard-coded here. */
 export const getHfModel = () => getKey(HF_MODEL_KEY) || DEFAULT_HF_MODEL;
@@ -22,7 +21,7 @@ function attachedAssets(scene: Scene, assets: Asset[]) {
 }
 
 /**
- * FLUX.1-schnell is text-to-image only (no `image` param), so reference assets are
+ * FLUX.1-schnell / SDXL are text-to-image only (no `image` param), so reference assets are
  * folded into the prompt as names + descriptions + reference-image URLs.
  */
 export function buildImagePrompt(scene: Scene, assets: Asset[]): string {
@@ -34,36 +33,85 @@ export function buildImagePrompt(scene: Scene, assets: Asset[]): string {
   return refs.length ? `${base}\n\nStrictly maintain visual consistency with these references: ${refs.join("; ")}` : base;
 }
 
-/** Calls Hugging Face via our server (no CORS). Handles cold start: waits estimated_time then retries (max 3). */
+/** Blob → data URL (for localStorage persistence; blob URLs die on reload). */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Calls Hugging Face Inference directly from the browser.
+ * - Retries up to 4 attempts; on 503 (model loading) waits `estimated_time` then retries.
+ * - Reads the successful response as a Blob → object URL for display + data URL for storage.
+ */
 export async function generateSceneImage(scene: Scene, assets: Asset[], onStatus?: (msg: string) => void): Promise<string> {
-  const token = getHfToken();
-  if (!token) throw new MissingHfTokenError();
+  const hfToken = getHfToken();
+  if (!hfToken) throw new MissingHfTokenError();
+  const modelId = getHfModel();
   const prompt = buildImagePrompt(scene, assets);
-  const model = getHfModel();
-  const MAX = 3;
-  for (let attempt = 0; ; attempt++) {
-    let r: Awaited<ReturnType<typeof hfGenerateImage>>;
-    try {
-      r = await hfGenerateImage({ data: { token, model, prompt } });
-    } catch (e) {
-      throw new Error(`Không kết nối được máy chủ tạo ảnh: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    if (r.ok) return r.dataUrl;
-    const { status, error: msg, estimated_time } = r;
-    const loading = estimated_time != null || /loading/i.test(msg);
-    if ((loading || status === 503 || status === 429) && attempt < MAX) {
-      const wait = Math.min(Math.max(Math.ceil(estimated_time ?? [5, 10, 20][attempt]!), 2), 120);
-      for (let s = wait; s > 0; s--) {
-        onStatus?.(loading ? `Đang tải mô hình, vui lòng chờ ${s} giây... (lần ${attempt + 1}/${MAX})` : `Hugging Face quá tải (${status}), thử lại sau ${s} giây... (lần ${attempt + 1}/${MAX})`);
-        await sleep(1000);
+  const url = `https://api-inference.huggingface.co/models/${modelId}`;
+
+  try {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + hfToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs: prompt }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 503) {
+          // Model is loading (cold start) — wait the estimated time, then retry.
+          let estimated = 10;
+          try {
+            const j = await response.json();
+            if (typeof j.estimated_time === "number") estimated = Math.max(2, Math.ceil(j.estimated_time));
+          } catch { /* body wasn't JSON — keep default */ }
+          for (let s = estimated; s > 0; s--) {
+            onStatus?.(`Mô hình đang khởi động, chờ ${s} giây... (lần ${attempt}/4)`);
+            await sleep(1000);
+          }
+          continue;
+        }
+        if (response.status === 429 && attempt < 4) {
+          for (let s = 6; s > 0; s--) {
+            onStatus?.(`Hugging Face quá tải (429), thử lại sau ${s} giây... (lần ${attempt}/4)`);
+            await sleep(1000);
+          }
+          continue;
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`Lỗi ${response.status}: Hugging Face Token không hợp lệ hoặc thiếu quyền Inference.`);
+        }
+        if (response.status === 404 || response.status === 410) {
+          throw new Error(`Lỗi ${response.status}: Model "${modelId}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID.`);
+        }
+        throw new Error(`Hugging Face lỗi ${response.status}: ${response.statusText || "Không rõ nguyên nhân"}`);
       }
-      continue;
+
+      // Success: read as Blob, make an object URL for immediate display.
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/")) {
+        throw new Error(`Hugging Face trả về dữ liệu không phải ảnh (${blob.type || "không rõ"}).`);
+      }
+      const imageUrl = URL.createObjectURL(blob);
+      // Persist a data-URL copy so the image survives reload (blob URLs don't).
+      try {
+        storeSceneImage(scene.id, await blobToDataUrl(blob));
+      } catch { /* best effort */ }
+      return imageUrl;
     }
-    if (status === 401 || status === 403) throw new Error(`Lỗi ${status}: Hugging Face Token không hợp lệ hoặc thiếu quyền Inference. (${msg})`);
-    if (status === 404 || status === 410 || /deprecated|not found|does not exist/i.test(msg)) {
-      throw new Error(`Lỗi ${status}: Model "${model}" không còn khả dụng — hãy mở ⚙️ Cài đặt và đổi Hugging Face Model ID. (${msg})`);
-    }
-    throw new Error(`Hugging Face lỗi ${status || "mạng"}: ${msg}`);
+    throw new Error("Mô hình vẫn đang khởi động sau 4 lần thử — vui lòng bấm Tạo ảnh lại sau ít phút.");
+  } catch (e) {
+    console.error("[generateSceneImage]", e);
+    throw e;
   }
 }
 
